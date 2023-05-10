@@ -7,6 +7,7 @@ from model import Model
 def build_model(device: str) -> Model:
     # STUDENT: return StudentModel()
     # STUDENT: your model MUST be loaded on the device "device" indicates
+    x = "First commit"
     return RandomBaseline()
 
 
