@@ -67,3 +67,39 @@ def list_all_values(data:List[dict],key:str):
         for key in candidate:
             labels.append(candidate[key])
     return labels
+
+def word_to_idx(word_to_idx:dict,sentence:List[str]):
+    """Converts tokens of strings in their indexes. If a token is unknown, its index is the <unk> key value
+
+    Args:
+        word_to_idx (dict): dictionary with structure {word:index}
+        sentence (list): list of tokens (strings)
+
+    Returns:
+        list: list of integers that represent tokens indexes
+    """
+    
+    res = []
+    for word in sentence:
+        
+        if word.lower() not in word_to_idx:
+            res.append(word_to_idx["<unk>"])
+        else:
+            res.append(word_to_idx[word.lower()])
+    return res
+
+def label_to_idx(labels_to_idx:dict, labels: List[str]):
+    """Converts labels string in integer indexes. 
+       
+
+    Args:
+        labels_to_idx (dictionary): dictionary with structure {label:index} 
+        labels (List[string]): List of labels (stings)
+
+    Returns:
+        list: list of integers that represent labels indexes
+    """
+    res = []
+    for label in labels:
+        res.append(labels_to_idx[label])
+    return res
