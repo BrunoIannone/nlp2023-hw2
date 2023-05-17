@@ -1,10 +1,27 @@
 import json
 import os
 from typing import List
-
-
-
+from transformers import AutoTokenizer
+import torch
+import time
+# we will use with Distil-BERT
+#language_model_name = "distilbert-base-uncased"
+# this GPU should be enough for this task to handle 32 samples per batch
+batch_size = 64
+# we keep num_workers = min(4 * number of GPUs, number of cores)
+# tells the data loader how many sub-processes to use for data loading
+num_workers = 1
+# optim
+learning_rate = 1e-3
+weight_decay = 0.0
+transformer_learning_rate = 1e-5
+transformer_weight_decay = 0.0
+# training
+epochs = 3
+device = "cuda" if torch.cuda.is_available() else "cpu"
+LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)
+tokenizer =  AutoTokenizer.from_pretrained("bert-base-cased")
 
 def build_data_from_jsonl(file_path:str): 
     """Split the JSONL file in file_path in sentences and relative labels 
@@ -89,6 +106,7 @@ def word_to_idx(word_to_idx:dict,sentence:List[str]):
     return res
 
 def label_to_idx(labels_to_idx:dict, labels: List[str]):
+    #print(labels)
     """Converts labels string in integer indexes. 
        
 
@@ -100,6 +118,74 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
         list: list of integers that represent labels indexes
     """
     res = []
+
     for label in labels:
-        res.append(labels_to_idx[label])
+        if label is None:
+            res.append(-100) 
+        else:
+            res.append(labels_to_idx[label])
     return res
+
+"""def collate_fn(batch): #-> Dict[str, torch.Tensor]:
+    res = []
+    sentences = []
+    labels = []
+    for sentence,label in batch:
+        sentences.append(sentence)
+        labels.append(torch.tensor(label))
+    batch_out = tokenizer(
+        
+        sentences ,
+        
+        return_tensors="pt",
+        padding=True,
+        # We use this argument because the texts in our dataset are lists of words.
+        is_split_into_words=True,
+    )
+    labels = torch.nn.utils.rnn.pad_sequence(labels,batch_first=True,padding_value=-100)
+    batch_out["labels"] = torch.as_tensor(labels)
+    #print(torch.as_tensor(labels).size())
+
+    return batch_out"""
+
+def collate_fn(batch):
+    sentences = []
+    labels_ = []
+    for sentence,label in batch:
+        sentences.append(sentence)
+        labels_.append(torch.tensor(label))
+
+    batch_out = tokenizer(
+        sentences,
+        return_tensors="pt",
+        padding=True,
+        # We use this argument because the texts in our dataset are lists of words.
+        is_split_into_words=True,
+    )
+    labels = []
+    ner_tags = labels_
+    for i, label in enumerate(ner_tags):
+      # obtains the word_ids of the i-th sentence
+      word_ids = batch_out.word_ids(batch_index=i)
+      previous_word_idx = None
+      label_ids = []
+      for word_idx in word_ids:
+        # Special tokens have a word id that is None. We set the label to -100 so they are automatically
+        # ignored in the loss function.
+        if word_idx is None:
+          label_ids.append(-100)
+        # We set the label for the first token of each word.
+        elif word_idx != previous_word_idx:
+          label_ids.append(label[word_idx])
+        # For the other tokens in a word, we set the label to -100 so they are automatically
+        # ignored in the loss function.
+        else:
+          label_ids.append(-100)
+        previous_word_idx = word_idx
+      labels.append(label_ids)
+    
+    # pad the labels with -100
+    batch_max_length = len(max(labels, key=len))
+    labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
+    batch_out["labels"] = torch.as_tensor(labels)
+    return batch_out

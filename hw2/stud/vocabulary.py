@@ -55,9 +55,9 @@ class Vocabulary():
         special_characters = "!@#$%^&*()-+?_=,<>/"
         idx = 0
 
-        word_to_idx["<pad>"] = idx
-        idx_to_word[idx] = "<pad>"
-        idx += 1
+        word_to_idx["<pad>"] = -100
+        idx_to_word[-100] = "<pad>"
+        #idx += 1
 
         word_to_idx["<unk>"] = idx
         idx_to_word[idx] = "<unk>"
@@ -96,8 +96,8 @@ class Vocabulary():
                     idx_to_labels[idx] = label
                     idx += 1
 
-        labels_to_idx['<pad>'] = idx
-        idx_to_labels[idx] = '<pad>'
+        labels_to_idx['<pad>'] = -100
+        idx_to_labels[-100] = '<pad>'
 
         return {
             "labels_to_idx": labels_to_idx,
