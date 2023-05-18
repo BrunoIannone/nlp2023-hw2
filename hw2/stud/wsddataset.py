@@ -52,7 +52,7 @@ class WsdDataset(Dataset):
         sentence = self.samples[index][0]
         labels = self.samples[index][1]
         length = len(sentence)
-        temp = ['O'] * length
+        temp = ['<pad>'] * length
         for sense in labels:
             temp[int(sense)] = labels[sense][0]
         #print(temp)

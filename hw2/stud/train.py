@@ -4,7 +4,7 @@ from datasets import load_metric
 import time
 def train(train_dataloader, epochs,optimizer,model,device,valid_dataloader,label_to_idx):
     number_of_training_steps = len([b for b in train_dataloader])
-    for epoch in range(epochs):  # loop over the dataset multiple times
+    for epoch in tqdm(range(epochs)):  # loop over the dataset multiple times
         batch_pbar = tqdm(enumerate(train_dataloader), total=number_of_training_steps)
         for i, batch in batch_pbar:
             # zero the parameter gradients

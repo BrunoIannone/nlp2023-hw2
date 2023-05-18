@@ -7,7 +7,7 @@ import time
 # we will use with Distil-BERT
 #language_model_name = "distilbert-base-uncased"
 # this GPU should be enough for this task to handle 32 samples per batch
-batch_size = 64
+batch_size = 128
 # we keep num_workers = min(4 * number of GPUs, number of cores)
 # tells the data loader how many sub-processes to use for data loading
 num_workers = 1
