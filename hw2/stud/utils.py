@@ -17,7 +17,7 @@ weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
 # training
-epochs = 3
+epochs = 50
 device = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)
@@ -189,3 +189,21 @@ def collate_fn(batch):
     labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
     batch_out["labels"] = torch.as_tensor(labels)
     return batch_out
+def build_all_senses(file_path):
+    try:
+        f = open(file_path, 'r')
+    except OSError:
+        print("Unable to open file in "+ str(file_path))
+    #line = f.readline()
+    senses = []
+    data = json.load(f)
+    for json_line in data:
+        #senses.append({json_line:data[json_line]}) uncomment for fine grained operations
+        senses.append([json_line])
+
+        
+
+
+    f.close()
+    #print(senses)
+    return senses

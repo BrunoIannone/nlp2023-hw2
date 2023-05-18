@@ -89,6 +89,9 @@ class Vocabulary():
         labels_to_idx = {}
         idx_to_labels = {}
         idx = 0
+        labels_to_idx['O'] = idx
+        idx_to_labels[idx] = 'O'
+        idx += 1
         for label_list in sentences_labels:
             for label in label_list:
                 if label not in labels_to_idx:

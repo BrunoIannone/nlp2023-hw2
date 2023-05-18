@@ -32,7 +32,7 @@ def validation(val_dataloader,device,model,label_to_idx):
         outputs = model(**batch, compute_predictions=True)
         y_true = batch["labels"].tolist()
         y_pred = outputs["predictions"].tolist()
-        label_list = label_to_idx.key()
+        label_list = list(label_to_idx.keys())
         true_predictions = [
             [label_list[p] for (p, l) in zip(pred, gold_label) if l != -100]
             for pred, gold_label in zip(y_pred, y_true)

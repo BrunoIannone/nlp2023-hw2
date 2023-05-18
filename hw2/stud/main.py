@@ -13,12 +13,12 @@ valid_data = utils.build_data_from_jsonl(
     os.path.join(utils.DIRECTORY_NAME, '../../data/coarse-grained/val_coarse_grained.json'))
 test_data = utils.build_data_from_jsonl(
     os.path.join(utils.DIRECTORY_NAME, '../../data/coarse-grained/test_coarse_grained.json'))
-
+senses = utils.build_all_senses(os.path.join(utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
 
 #As vocabulary init class accept lists as input, this aux function does the conversion
 list_candidates = utils.list_all_values(training_data,'candidates')
-vocab = vocabulary.Vocabulary(training_data["words"],list_candidates)
-
+vocab = vocabulary.Vocabulary(training_data["words"],senses)
+#print(vocab.labels_to_idx)
 train_dataset = wsddataset.WsdDataset(training_data["words"],training_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
 valid_dataset = wsddataset.WsdDataset(valid_data["words"],valid_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
 test_dataset = wsddataset.WsdDataset(test_data["words"],test_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
