@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 import train
 import model as mod
+import pytorch_lightning as pl
 
 training_data = utils.build_data_from_jsonl(
     os.path.join(utils.DIRECTORY_NAME, '../../data/coarse-grained/train_coarse_grained.json'))
@@ -32,20 +33,22 @@ test_dataloader = DataLoader(test_dataset,batch_size=utils.batch_size,collate_fn
 
 # instantiate the model
 model = mod.NERModule(utils.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()), fine_tune_lm=False)
-model.to(utils.device)
+#model.to(utils.device)
 
 # optimizer
-groups = [
-  {
-    "params": model.classifier.parameters(),
-    "lr": utils.learning_rate,
-    "weight_decay": utils.weight_decay,
-  },
-  {
-    "params": model.transformer_model.parameters(),
-    "lr": utils.transformer_learning_rate,
-    "weight_decay": utils.transformer_weight_decay,
-  },
-]
-optimizer = Adam(groups)
-train.train(train_dataloader,utils.epochs,optimizer,model,utils.device,valid_dataloader,vocab.labels_to_idx)
+#groups = [
+#  {
+#    "params": model.classifier.parameters(),
+#    "lr": utils.learning_rate,
+#    "weight_decay": utils.weight_decay,
+ # },
+#  {
+#    "params": model.transformer_model.parameters(),
+#    "lr": utils.transformer_learning_rate,
+ #   "weight_decay": utils.transformer_weight_decay,
+#  },
+#]
+#optimizer = Adam(groups)
+#train.train(train_dataloader,utils.epochs,model,utils.device,valid_dataloader,vocab.labels_to_idx)
+trainer = pl.Trainer()
+trainer.fit(model,train_dataloader,valid_dataloader)

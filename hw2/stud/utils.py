@@ -149,19 +149,27 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
     return batch_out"""
 
 def collate_fn(batch):
-    sentences = []
+    #print(batch)
+    sentences = {"input_ids":[],"attention_mask": [],"token_type_ids" :[]}
     labels_ = []
     for sentence,label in batch:
-        sentences.append(sentence)
-        labels_.append(torch.tensor(label))
+        sentences["input_ids"].append(sentence["input_ids"])
+        sentences["attention_mask"].append(sentence["attention_mask"])
+        sentences["token_type_ids"].append(sentence["token_type_ids"])
 
-    batch_out = tokenizer(
-        sentences,
-        return_tensors="pt",
-        padding=True,
+        labels_.append(torch.tensor(label))
+    
+    sentences["input_ids"] = torch.nn.utils.rnn.pad_sequence(sentences["input_ids"])
+    sentences["attention_mask"] = torch.nn.utils.rnn.pad_sequence(sentences["attention_mask"])
+    sentences["token_type_ids"] = torch.nn.utils.rnn.pad_sequence(sentences["token_type_ids"])
+
+    #batch_out = tokenizer(
+       # sentences,
+      #  return_tensors="pt",
+      #  padding=True,
         # We use this argument because the texts in our dataset are lists of words.
-        is_split_into_words=True,
-    )
+       # is_split_into_words=True,
+    #)
     labels = []
     ner_tags = labels_
     for i, label in enumerate(ner_tags):

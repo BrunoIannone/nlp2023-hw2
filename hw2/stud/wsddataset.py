@@ -2,6 +2,8 @@ from torch.utils.data import Dataset
 import utils
 from typing import List
 import torch 
+from transformers import AutoTokenizer
+
 class WsdDataset(Dataset):
     """WSD dataset class
     """
@@ -50,11 +52,17 @@ class WsdDataset(Dataset):
             tuple: (List[token indexes (int)], List[labels indexes (int)]) of the index-th element
         """
         sentence = self.samples[index][0]
+        sentence = utils.tokenizer(sentence,padding=True,is_split_into_words=True)
+        #print(sentence)
         labels = self.samples[index][1]
-        length = len(sentence)
-        temp = ['<pad>'] * length
+        length = len(sentence["input_ids"])
+        #print(length)
+        
+        temp = ['O'] * length
         for sense in labels:
-            temp[int(sense)] = labels[sense][0]
+            #print(sense)
+            #print(temp)
+            temp[int(sense)+1] = labels[sense][0]
         #print(temp)
         #res = utils.word_to_idx(self.word_to_idx, sentence), utils.label_to_idx(
             #self.labels_to_idx, labels)
