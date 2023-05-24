@@ -54,6 +54,8 @@ class WsdDataset(Dataset):
         sentence = self.samples[index][0]
         sentence = utils.tokenizer(sentence,padding=True,is_split_into_words=True)
         #print(sentence)
+        word_ids = sentence.word_ids()
+        print(word_ids)
         labels = self.samples[index][1]
         length = len(sentence["input_ids"])
         #print(length)
@@ -68,6 +70,6 @@ class WsdDataset(Dataset):
             #self.labels_to_idx, labels)
 
         res =  sentence, utils.label_to_idx(
-            self.labels_to_idx, temp)
+            self.labels_to_idx, temp),word_ids
         #print(res)
         return res

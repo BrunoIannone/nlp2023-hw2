@@ -151,13 +151,14 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
 def collate_fn(batch):
     #print(batch)
     sentences = {"input_ids":[],"attention_mask": [],"token_type_ids" :[]}
-    labels_ = []
-    for sentence,label in batch:
+    labels = []
+    word_ids_list = []
+    for sentence,label_,word_ids_ in batch:
         sentences["input_ids"].append(sentence["input_ids"])
         sentences["attention_mask"].append(sentence["attention_mask"])
         sentences["token_type_ids"].append(sentence["token_type_ids"])
-
-        labels_.append(torch.tensor(label))
+        word_ids_list.append(word_ids_)
+        labels.append(label_)
     
     sentences["input_ids"] = torch.nn.utils.rnn.pad_sequence(sentences["input_ids"])
     sentences["attention_mask"] = torch.nn.utils.rnn.pad_sequence(sentences["attention_mask"])
@@ -170,13 +171,14 @@ def collate_fn(batch):
         # We use this argument because the texts in our dataset are lists of words.
        # is_split_into_words=True,
     #)
-    labels = []
-    ner_tags = labels_
+    
+    ner_tags = labels
     for i, label in enumerate(ner_tags):
       # obtains the word_ids of the i-th sentence
-      word_ids = batch_out.word_ids(batch_index=i)
+      #word_ids = batch_out.word_ids(batch_index=i)
       previous_word_idx = None
       label_ids = []
+      word_ids = word_ids_list[i]
       for word_idx in word_ids:
         # Special tokens have a word id that is None. We set the label to -100 so they are automatically
         # ignored in the loss function.
@@ -195,8 +197,9 @@ def collate_fn(batch):
     # pad the labels with -100
     batch_max_length = len(max(labels, key=len))
     labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
-    batch_out["labels"] = torch.as_tensor(labels)
-    return batch_out
+    sentences["labels"] = torch.as_tensor(labels)
+    return sentences
+
 def build_all_senses(file_path):
     try:
         f = open(file_path, 'r')
