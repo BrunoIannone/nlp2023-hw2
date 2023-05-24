@@ -4,6 +4,7 @@ from typing import List
 from transformers import AutoTokenizer
 import torch
 import time
+import evaluate
 # we will use with Distil-BERT
 #language_model_name = "distilbert-base-uncased"
 # this GPU should be enough for this task to handle 32 samples per batch
@@ -22,6 +23,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)
 tokenizer =  AutoTokenizer.from_pretrained("bert-base-cased")
+#tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+seqeval = evaluate.load("seqeval")
 
 def build_data_from_jsonl(file_path:str): 
     """Split the JSONL file in file_path in sentences and relative labels 
@@ -148,57 +151,7 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
 
     return batch_out"""
 
-def collate_fn(batch):
-    #print(batch)
-    sentences = {"input_ids":[],"attention_mask": [],"token_type_ids" :[]}
-    labels = []
-    word_ids_list = []
-    for sentence,label_,word_ids_ in batch:
-        sentences["input_ids"].append(sentence["input_ids"])
-        sentences["attention_mask"].append(sentence["attention_mask"])
-        sentences["token_type_ids"].append(sentence["token_type_ids"])
-        word_ids_list.append(word_ids_)
-        labels.append(label_)
-    
-    sentences["input_ids"] = torch.nn.utils.rnn.pad_sequence(sentences["input_ids"])
-    sentences["attention_mask"] = torch.nn.utils.rnn.pad_sequence(sentences["attention_mask"])
-    sentences["token_type_ids"] = torch.nn.utils.rnn.pad_sequence(sentences["token_type_ids"])
 
-    #batch_out = tokenizer(
-       # sentences,
-      #  return_tensors="pt",
-      #  padding=True,
-        # We use this argument because the texts in our dataset are lists of words.
-       # is_split_into_words=True,
-    #)
-    
-    ner_tags = labels
-    for i, label in enumerate(ner_tags):
-      # obtains the word_ids of the i-th sentence
-      #word_ids = batch_out.word_ids(batch_index=i)
-      previous_word_idx = None
-      label_ids = []
-      word_ids = word_ids_list[i]
-      for word_idx in word_ids:
-        # Special tokens have a word id that is None. We set the label to -100 so they are automatically
-        # ignored in the loss function.
-        if word_idx is None:
-          label_ids.append(-100)
-        # We set the label for the first token of each word.
-        elif word_idx != previous_word_idx:
-          label_ids.append(label[word_idx])
-        # For the other tokens in a word, we set the label to -100 so they are automatically
-        # ignored in the loss function.
-        else:
-          label_ids.append(-100)
-        previous_word_idx = word_idx
-      labels.append(label_ids)
-    
-    # pad the labels with -100
-    batch_max_length = len(max(labels, key=len))
-    labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
-    sentences["labels"] = torch.as_tensor(labels)
-    return sentences
 
 def build_all_senses(file_path):
     try:
@@ -218,3 +171,66 @@ def build_all_senses(file_path):
     f.close()
     #print(senses)
     return senses
+
+def collate_fn(batch):
+    batch_out = tokenizer(
+        [sentence["tokens"] for sentence in batch],
+        return_tensors="pt",
+        padding=True,
+        # We use this argument because the texts in our dataset are lists of words.
+        is_split_into_words=True,
+    )
+    labels = []
+    ner_tags = [sentence["ner_tags"] for sentence in batch]
+    for i, label in enumerate(ner_tags):
+      # obtains the word_ids of the i-th sentence
+      word_ids = batch_out.word_ids(batch_index=i)
+      previous_word_idx = None
+      label_ids = []
+      for word_idx in word_ids:
+        # Special tokens have a word id that is None. We set the label to -100 so they are automatically
+        # ignored in the loss function.
+        if word_idx is None:
+          label_ids.append(-100)
+        # We set the label for the first token of each word.
+        elif word_idx != previous_word_idx:
+          label_ids.append(label[word_idx])
+        # For the other tokens in a word, we set the label to -100 so they are automatically
+        # ignored in the loss function.
+        else:
+          label_ids.append(-100)
+        previous_word_idx = word_idx
+      labels.append(label_ids)
+    
+    # pad the labels with -100
+    batch_max_length = len(max(labels, key=len))
+    labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
+    batch_out["labels"] = torch.as_tensor(labels)
+    return batch_out
+def compute_metrics(labels,outputs,label_list):
+    outputs = outputs.argmax(dim=-1)
+    #print(outputs)
+    y_true = labels.tolist()
+    y_pred = outputs.tolist()
+    predictions, labels = [], []
+
+    true_predictions = [
+        [label_list[p] for (p, l) in zip(pred, gold_label) if l != -100 ]
+        for pred, gold_label in zip(y_pred, y_true)
+    ]
+    true_labels = [
+        [label_list[l] for (p, l) in zip(pred, gold_label) if l != -100]
+        for pred, gold_label in zip(y_pred, y_true)
+    ]
+    predictions += true_predictions
+    labels += true_labels
+
+
+
+    results = seqeval.compute(predictions=predictions, references=labels)
+    return {
+        "precision": results["overall_precision"],
+        "recall": results["overall_recall"],
+        "f1": results["overall_f1"],
+        "accuracy": results["overall_accuracy"],
+    }

@@ -3,7 +3,8 @@ import utils
 from typing import List
 import torch 
 from transformers import AutoTokenizer
-
+from transformers import DataCollatorForTokenClassification
+import time
 class WsdDataset(Dataset):
     """WSD dataset class
     """
@@ -52,24 +53,24 @@ class WsdDataset(Dataset):
             tuple: (List[token indexes (int)], List[labels indexes (int)]) of the index-th element
         """
         sentence = self.samples[index][0]
-        sentence = utils.tokenizer(sentence,padding=True,is_split_into_words=True)
         #print(sentence)
-        word_ids = sentence.word_ids()
-        print(word_ids)
+
         labels = self.samples[index][1]
-        length = len(sentence["input_ids"])
+        length = len(sentence)
         #print(length)
         
         temp = ['O'] * length
         for sense in labels:
             #print(sense)
             #print(temp)
-            temp[int(sense)+1] = labels[sense][0]
+            temp[int(sense)] = labels[sense][0]
         #print(temp)
+        #print(len(temp))
         #res = utils.word_to_idx(self.word_to_idx, sentence), utils.label_to_idx(
             #self.labels_to_idx, labels)
-
-        res =  sentence, utils.label_to_idx(
-            self.labels_to_idx, temp),word_ids
-        #print(res)
-        return res
+        #print(temp)
+        #time.sleep(5)
+        return {
+            'tokens': sentence,
+            'ner_tags': utils.label_to_idx(self.labels_to_idx, temp)
+        }
