@@ -56,21 +56,8 @@ class WsdDataset(Dataset):
         #print(sentence)
 
         labels = self.samples[index][1]
-        length = len(sentence)
-        #print(length)
         
-        temp = ['O'] * length
-        for sense in labels:
-            #print(sense)
-            #print(temp)
-            temp[int(sense)] = labels[sense][0]
-        #print(temp)
-        #print(len(temp))
-        #res = utils.word_to_idx(self.word_to_idx, sentence), utils.label_to_idx(
-            #self.labels_to_idx, labels)
-        #print(temp)
-        #time.sleep(5)
         return {
             'tokens': sentence,
-            'ner_tags': utils.label_to_idx(self.labels_to_idx, temp)
+            'ner_tags': utils.label_to_idx(self.labels_to_idx, labels)
         }

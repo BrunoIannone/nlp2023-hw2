@@ -48,14 +48,16 @@ def build_data_from_jsonl(file_path:str):
     senses = []
     data = json.load(f)
     for json_line in data:
-        words.append(data[json_line]["words"])
-        candidates.append(data[json_line]["candidates"])
-        lemmas.append(data[json_line]["lemmas"])
-        pos_tags.append(data[json_line]["pos_tags"])
-        senses.append(data[json_line]["senses"])
-        instance_ids.append(data[json_line]["instance_ids"])
-        
+        for sense in data[json_line]["senses"]:
+            words.append(data[json_line]["words"])
+            candidates.append(data[json_line]["candidates"][sense])
 
+            lemmas.append(data[json_line]["lemmas"])
+            pos_tags.append(data[json_line]["pos_tags"])
+            senses.append(data[json_line]["senses"][sense])
+            instance_ids.append(data[json_line]["instance_ids"][sense])
+        
+    
 
     f.close()
 
@@ -80,6 +82,8 @@ def list_all_values(data:List[dict],key:str):
     Returns:
         List[str]: List containing all the values
     """
+    print(data)
+    time.sleep(5)
     if key not in data:
         raise "NOT VALID INPUT KEY, KEY NOT FOUND IN DICTIONARY"
     labels = []
@@ -129,29 +133,6 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
             res.append(labels_to_idx[label])
     return res
 
-"""def collate_fn(batch): #-> Dict[str, torch.Tensor]:
-    res = []
-    sentences = []
-    labels = []
-    for sentence,label in batch:
-        sentences.append(sentence)
-        labels.append(torch.tensor(label))
-    batch_out = tokenizer(
-        
-        sentences ,
-        
-        return_tensors="pt",
-        padding=True,
-        # We use this argument because the texts in our dataset are lists of words.
-        is_split_into_words=True,
-    )
-    labels = torch.nn.utils.rnn.pad_sequence(labels,batch_first=True,padding_value=-100)
-    batch_out["labels"] = torch.as_tensor(labels)
-    #print(torch.as_tensor(labels).size())
-
-    return batch_out"""
-
-
 
 def build_all_senses(file_path):
     try:
@@ -180,33 +161,12 @@ def collate_fn(batch):
         # We use this argument because the texts in our dataset are lists of words.
         is_split_into_words=True,
     )
-    labels = []
-    ner_tags = [sentence["ner_tags"] for sentence in batch]
-    for i, label in enumerate(ner_tags):
-      # obtains the word_ids of the i-th sentence
-      word_ids = batch_out.word_ids(batch_index=i)
-      previous_word_idx = None
-      label_ids = []
-      for word_idx in word_ids:
-        # Special tokens have a word id that is None. We set the label to -100 so they are automatically
-        # ignored in the loss function.
-        if word_idx is None:
-          label_ids.append(-100)
-        # We set the label for the first token of each word.
-        elif word_idx != previous_word_idx:
-          label_ids.append(label[word_idx])
-        # For the other tokens in a word, we set the label to -100 so they are automatically
-        # ignored in the loss function.
-        else:
-          label_ids.append(-100)
-        previous_word_idx = word_idx
-      labels.append(label_ids)
     
-    # pad the labels with -100
-    batch_max_length = len(max(labels, key=len))
-    labels = [l + ([-100] * abs(batch_max_length - len(l))) for l in labels]
+    labels = [sentence["ner_tags"] for sentence in batch]
+    
     batch_out["labels"] = torch.as_tensor(labels)
     return batch_out
+
 def compute_metrics(labels,outputs,label_list):
     outputs = outputs.argmax(dim=-1)
     #print(outputs)

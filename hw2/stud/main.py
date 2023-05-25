@@ -3,14 +3,12 @@ import os
 import vocabulary
 import wsddataset
 from torch.utils.data import DataLoader
-from torch.optim import Adam
-import train
+import time
 import model as mod
 import pytorch_lightning as pl
 from transformers import DataCollatorForTokenClassification
-import evaluate
-from transformers import TrainingArguments, Trainer,AutoModelForTokenClassification
-import datasets
+
+
 training_data = utils.build_data_from_jsonl(
     os.path.join(utils.DIRECTORY_NAME, '../../data/coarse-grained/train_coarse_grained.json'))
 valid_data = utils.build_data_from_jsonl(
@@ -20,12 +18,10 @@ test_data = utils.build_data_from_jsonl(
 senses = utils.build_all_senses(os.path.join(utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
 
 data_collator = DataCollatorForTokenClassification(tokenizer=utils.tokenizer)
-seqeval = evaluate.load("seqeval")
 
-#As vocabulary init class accept lists as input, this aux function does the conversion
-list_candidates = utils.list_all_values(training_data,'candidates')
+
 vocab = vocabulary.Vocabulary(training_data["words"],senses)
-#print(vocab.labels_to_idx)
+
 train_dataset = wsddataset.WsdDataset(training_data["words"],training_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
 valid_dataset = wsddataset.WsdDataset(valid_data["words"],valid_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
 test_dataset = wsddataset.WsdDataset(test_data["words"],test_data["senses"],vocab.word_to_idx,vocab.labels_to_idx)
@@ -34,32 +30,8 @@ train_dataloader = DataLoader(train_dataset,batch_size=utils.batch_size,collate_
 valid_dataloader = DataLoader(valid_dataset,batch_size=utils.batch_size,collate_fn=utils.collate_fn,shuffle=False)
 #test_dataloader = DataLoader(test_dataset,batch_size=utils.batch_size,collate_fn=utils.collate_fn,shuffle=False)
 
-#print(train_dataset[150][0])
-#utils.collate_fn(train_dataset[150])
+model = mod.WSD(utils.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=False)
 
-# instantiate the model
-#print(vocab.labels_to_idx)
-model = mod.NERModule(utils.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=False)
-
-#model.to(utils.device)
-#model = AutoModelForTokenClassification.from_pretrained(
-#    "distilbert-base-uncased", num_labels=len(vocab.labels_to_idx.keys()), id2label=vocab.idx_to_labels, label2id=vocab.labels_to_idx
-#)
-# optimizer
-#groups = [
-#  {
-#    "params": model.classifier.parameters(),
-#    "lr": utils.learning_rate,
-#    "weight_decay": utils.weight_decay,
- # },
-#  {
-#    "params": model.transformer_model.parameters(),
-#    "lr": utils.transformer_learning_rate,
- #   "weight_decay": utils.transformer_weight_decay,
-#  },
-#]
-#optimizer = Adam(groups)
-#train.train(train_dataloader,utils.epochs,model,utils.device,valid_dataloader,vocab.labels_to_idx)
 trainer = pl.Trainer()
 trainer.fit(model,train_dataloader,valid_dataloader)
 
