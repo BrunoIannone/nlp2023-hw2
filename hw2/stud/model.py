@@ -3,7 +3,7 @@ from pytorch_lightning.utilities.types import STEP_OUTPUT
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel
-import utils as ut
+import utilz
 import os
 from torch import optim, nn, utils, Tensor
 import pytorch_lightning as pl
@@ -27,6 +27,7 @@ class WSD(pl.LightningModule):
         
     def forward(
         self,
+        idx,
         input_ids: torch.Tensor = None,
         attention_mask: torch.Tensor = None,
         token_type_ids: torch.Tensor = None,
@@ -45,26 +46,34 @@ class WSD(pl.LightningModule):
         if token_type_ids is not None:
           model_kwargs["token_type_ids"] = token_type_ids
 
-        print(input_ids.size()) #128 x max_length
+        #print(input_ids.size()) #batch x max_length
         #print(input_ids)
-        print(labels.size()) #128x1
-        time.sleep(5)
+        #print(labels.size()) #batch x 1
+        #time.sleep(5)
         transformers_outputs = self.transformer_model(**model_kwargs)
-        print("TRANSFORMERS_OUTPUTS: " + str(transformers_outputs[0].size())) #128 x max_length x 768 (hidden_size) 
-        
+        print("TRANSFORMERS_OUTPUTS: " + str(transformers_outputs)) #128 x max_length x 768 (hidden_size) 
+        x = transformers_outputs[0]
         # we would like to use the sum of the last four hidden layers
         #transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
         #transformers_outputs_sum = self.dropout(transformers_outputs_sum)
         #print("transformers_outputs_sum[0]: " + str(transformers_outputs_sum[0].size()))
         #logits = F.log_softmax(self.classifier(transformers_outputs_sum),dim = -1)
         
-        print("OUTPUT: " + str(transformers_outputs["hidden_states"]))
+        #print("OUTPUT: " + str(transformers_outputs["hidden_states"]))
+        
+        res = []
+        for i in range(x.size(0)):
+            
+            for elem in range(len(idx[i])):
+            
+                y = torch.stack((x[i][0],x[i][idx[i][elem]]), dim = -2)
+                sum = torch.sum(y, dim = -2)
+                res.append(sum)
+
+            print("------")
         logits = self.classifier(transformers_outputs)
-        print("LOGITS: " + str(logits.size()))
-        
-        
-        
-        
+        #print("LOGITS: " + str(logits.size()))
+                
         return logits
 
     
@@ -73,10 +82,10 @@ class WSD(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
     def training_step(self,train_batch,batch_idx):
-        print("ALAAAAAAHAHHAHAHAHA")
-        time.sleep(5)
         batch = {k: v for k, v in train_batch.items()}
             # ** operator converts batch items in named arguments, (e.g. 'input_ids', 'attention_mask_ids' ...), taken as input by the model forward pass
+        print(batch)
+        time.sleep(5)
         labels = train_batch['labels']
         #print(batch)
         

@@ -4,11 +4,12 @@ from typing import List
 from transformers import AutoTokenizer
 import torch
 import time
+
 import evaluate
 # we will use with Distil-BERT
 #language_model_name = "distilbert-base-uncased"
 # this GPU should be enough for this task to handle 32 samples per batch
-batch_size = 128
+BATCH = 1
 # we keep num_workers = min(4 * number of GPUs, number of cores)
 # tells the data loader how many sub-processes to use for data loading
 num_workers = 1
@@ -46,29 +47,33 @@ def build_data_from_jsonl(file_path:str):
     instance_ids = []
     pos_tags = []
     senses = []
+    samples = []
     data = json.load(f)
     for json_line in data:
-        for sense in data[json_line]["senses"]:
-            words.append(data[json_line]["words"])
-            candidates.append(data[json_line]["candidates"][sense])
+        samples.append({"instance_ids": data[json_line]["instance_ids"],"lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],"pos_tags": data[json_line]["pos_tags"],"senses":data[json_line]["senses"],"candidates":data[json_line]["candidates"]})
+        words.append(data[json_line]["words"])
+        #print(data[json_line]["words"])
+        #time.sleep(5)
+        #candidates.append(data[json_line]["candidates"])
 
-            lemmas.append(data[json_line]["lemmas"])
-            pos_tags.append(data[json_line]["pos_tags"])
-            senses.append(data[json_line]["senses"][sense])
-            instance_ids.append(data[json_line]["instance_ids"][sense])
+        #lemmas.append(data[json_line]["lemmas"])
+        #pos_tags.append(data[json_line]["pos_tags"])
+        #senses.append(data[json_line]["senses"])
+        
+        #instance_ids.append(data[json_line]["instance_ids"])
         
     
-
     f.close()
 
     return {
-
-        'instance_ids': instance_ids,
-        'lemmas': lemmas,
-        'pos_tags': pos_tags,
-        'senses': senses,
-        'words': words,
-        'candidates': candidates,
+        "samples": samples,
+        "words": words
+        #'instance_ids': instance_ids,
+        #'lemmas': lemmas,
+        #'pos_tags': pos_tags,
+        #'senses': senses,
+        #'words': words,
+        #'candidates': candidates
 
     }
 
@@ -82,7 +87,7 @@ def list_all_values(data:List[dict],key:str):
     Returns:
         List[str]: List containing all the values
     """
-    print(data)
+    #print(data)
     time.sleep(5)
     if key not in data:
         raise "NOT VALID INPUT KEY, KEY NOT FOUND IN DICTIONARY"
@@ -124,14 +129,20 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
     Returns:
         list: list of integers that represent labels indexes
     """
-    res = []
+    
 
     for label in labels:
-        if label is None:
-            res.append(-100) 
-        else:
-            res.append(labels_to_idx[label])
-    return res
+        #print(labels)
+        #print(label)
+        temp = []
+        for value in labels[label]:
+            
+            temp.append(labels_to_idx[value])
+        labels[label] = temp
+        #print(labels)
+        #time.sleep(5)
+
+    return labels
 
 
 def build_all_senses(file_path):
@@ -154,17 +165,35 @@ def build_all_senses(file_path):
     return senses
 
 def collate_fn(batch):
+    print("COLLATOOOOO")
+    
     batch_out = tokenizer(
-        [sentence["tokens"] for sentence in batch],
+        [sentence["sample"]["words"] for sentence in batch],
         return_tensors="pt",
         padding=True,
         # We use this argument because the texts in our dataset are lists of words.
         is_split_into_words=True,
     )
     
-    labels = [sentence["ner_tags"] for sentence in batch]
+    labels = []
+    idx = []
+    #print(labels)
+    for sentence in batch:
+        #print(sentence)
+        label = sentence["senses"]
+        idx.append(tuple(label.keys()))
+        
+        for index in label:
+            labels.extend(label[index])
+            
+        
+        #print(labels)
+        #print(idx)
+        #time.sleep(5)
+            
     
     batch_out["labels"] = torch.as_tensor(labels)
+    batch_out["idx"] = torch.as_tensor(idx)
     return batch_out
 
 def compute_metrics(labels,outputs,label_list):
