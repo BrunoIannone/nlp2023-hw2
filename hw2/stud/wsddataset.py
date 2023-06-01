@@ -50,7 +50,7 @@ class WsdDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, index: int):
-        print(index)
+        #print(index)
         #print(self.samples[0:5])
         #time.sleep(100)
         """Get item for dataloader input

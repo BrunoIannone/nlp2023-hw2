@@ -4,12 +4,12 @@ from typing import List
 from transformers import AutoTokenizer
 import torch
 import time
-
+import numpy as np
 import evaluate
 # we will use with Distil-BERT
 #language_model_name = "distilbert-base-uncased"
 # this GPU should be enough for this task to handle 32 samples per batch
-BATCH = 1
+BATCH = 128
 # we keep num_workers = min(4 * number of GPUs, number of cores)
 # tells the data loader how many sub-processes to use for data loading
 num_workers = 1
@@ -175,29 +175,22 @@ def collate_fn(batch):
         is_split_into_words=True,
     )
     
-    labels = []
-    idx = []
-    #print(labels)
-    for sentence in batch:
-        #print(sentence)
-        label = sentence["senses"]
-        idx.append(tuple(label.keys()))
-        
-        for index in label:
-            labels.extend(label[index])
-            
+    
+    labels,idx = extract_labels_and_senses_index(batch)   
         
         #print(labels)
-        #print(idx)
-        #time.sleep(5)
+    #print(idx)
+    #time.sleep(5)
             
     
-    batch_out["labels"] = torch.as_tensor(labels)
-    batch_out["idx"] = torch.as_tensor(idx)
+    batch_out["labels"] = labels
+    batch_out["senses"] = idx
+    
+    #batch_out["idx"] = np.array((idx))
     return batch_out
 
 def compute_metrics(labels,outputs,label_list):
-    outputs = outputs.argmax(dim=-1)
+    """ outputs = outputs.argmax(dim=1)
     #print(outputs)
     y_true = labels.tolist()
     y_pred = outputs.tolist()
@@ -222,4 +215,36 @@ def compute_metrics(labels,outputs,label_list):
         "recall": results["overall_recall"],
         "f1": results["overall_f1"],
         "accuracy": results["overall_accuracy"],
-    }
+    } """
+    return 5
+
+
+def extract_labels_and_senses_index(batch):
+    
+# Utilizziamo pad_sequence per riempire i tensori con valore di padding 0
+    #padded_sequences = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True, padding_value=0)
+
+    
+    labels = []
+    idx = []
+    #print(labels)
+    for sentence in batch:
+        #print(sentence)
+        label = sentence["senses"]
+        temp = []
+        for index in label:
+            temp.append(int(index))
+            labels.extend(label[index])
+        idx.append(torch.tensor(temp))
+        #print(idx)
+        #time.sleep(5)
+    print("PRIMA " + str(idx))
+
+    idx = torch.nn.utils.rnn.pad_sequence(idx, batch_first=True, padding_value=-1)
+    print("dopo " + str(idx))
+    time.sleep(5)
+
+
+    #print(idx)
+    return torch.as_tensor(labels), idx
+            
