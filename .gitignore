@@ -1,3 +1,5 @@
 *.stderr
 /hw2/stud/__init__.py
 /logs/server.stdout
+/hw2/stud/__pycache__/
+/hw2/stud/lightning_logs/

@@ -177,16 +177,9 @@ def collate_fn(batch):
     
     
     labels,idx = extract_labels_and_senses_index(batch)   
-        
-        #print(labels)
-    #print(idx)
-    #time.sleep(5)
-            
-    
     batch_out["labels"] = labels
-    batch_out["senses"] = idx
+    batch_out["idx"] = idx
     
-    #batch_out["idx"] = np.array((idx))
     return batch_out
 
 def compute_metrics(labels,outputs,label_list):
@@ -221,8 +214,7 @@ def compute_metrics(labels,outputs,label_list):
 
 def extract_labels_and_senses_index(batch):
     
-# Utilizziamo pad_sequence per riempire i tensori con valore di padding 0
-    #padded_sequences = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True, padding_value=0)
+
 
     
     labels = []
@@ -231,20 +223,50 @@ def extract_labels_and_senses_index(batch):
     for sentence in batch:
         #print(sentence)
         label = sentence["senses"]
+        #print("Senses: " + str(label))
         temp = []
         for index in label:
+            #print("index: " + str(index))
             temp.append(int(index))
-            labels.extend(label[index])
+            if(len(label[index])>1):
+                labels.append(label[index][0])
+            else:
+                labels.extend(label[index])
+            #print("List: " + str(labels))
         idx.append(torch.tensor(temp))
-        #print(idx)
         #time.sleep(5)
-    print("PRIMA " + str(idx))
 
     idx = torch.nn.utils.rnn.pad_sequence(idx, batch_first=True, padding_value=-1)
-    print("dopo " + str(idx))
-    time.sleep(5)
-
-
+    #print("List: " + str(labels))
     #print(idx)
-    return torch.as_tensor(labels), idx
-            
+    labels = torch.as_tensor(labels)
+
+    return labels , idx
+
+def get_idx_from_tensor(tensor_idx):
+    idx = []
+    for row in tensor_idx:
+        #print(row)
+        temp = []
+        for elem in row:
+            if elem == -1:
+                break
+            temp.append(int(elem))
+        idx.append(tuple(temp))
+        #print(idx)
+        #time.sleep(2)
+    
+    return idx
+def get_senses_vector(model_output, tensor_idx):
+    idx = get_idx_from_tensor(tensor_idx)
+    res = []
+    for i in range(model_output.size(0)):
+        
+        for elem in range(len(idx[i])):
+        
+            y = torch.stack((model_output[i][0],model_output[i][idx[i][elem]]), dim = -2)
+            sum = torch.sum(y, dim = -2)
+            res.append(sum)
+
+    res = torch.stack(res, dim = -2)
+    return res

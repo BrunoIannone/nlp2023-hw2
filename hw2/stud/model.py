@@ -27,6 +27,7 @@ class WSD(pl.LightningModule):
         
     def forward(
         self,
+        idx,
         input_ids: torch.Tensor = None,
         attention_mask: torch.Tensor = None,
         token_type_ids: torch.Tensor = None,
@@ -44,12 +45,12 @@ class WSD(pl.LightningModule):
         # not every model supports token_type_ids
         if token_type_ids is not None:
           model_kwargs["token_type_ids"] = token_type_ids
-       
+        
+        #idx = utilz.get_idx_from_tensor(idx)
             
         
-        print(input_ids)
+        #print(input_ids)
         #print(idx)
-        time.sleep(5)
         #print(input_ids.size()) #batch x max_length
         #print(input_ids)
         #print(labels.size()) #batch x 1
@@ -64,18 +65,8 @@ class WSD(pl.LightningModule):
         #logits = F.log_softmax(self.classifier(transformers_outputs_sum),dim = -1)
         
         #print("OUTPUT: " + str(transformers_outputs["hidden_states"]))
+        res = utilz.get_senses_vector(x,idx )
         
-        res = []
-        for i in range(x.size(0)):
-            
-            for elem in range(len(idx[i])):
-            
-                y = torch.stack((x[i][0],x[i][idx[i][elem]]), dim = -2)
-                sum = torch.sum(y, dim = -2)
-                res.append(sum)
-
-            print("------")
-        res = torch.stack(res, dim = -2)
         logits = self.classifier(res)
         #print("LOGITS: " + str(logits.size()))
                 
@@ -87,32 +78,11 @@ class WSD(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
     def training_step(self,train_batch,batch_idx):
-        #batch = {k: v for k, v in train_batch.items()}
-            # ** operator converts batch items in named arguments, (e.g. 'input_ids', 'attention_mask_ids' ...), taken as input by the model forward pass
-        
-        #labels = []
-        #idx = []
-        #print(labels)
-        #for sentence in train_batch:
-            #print(sentence)
-            #label = sentence["senses"]
-            #temp = []
-            #for index in label:
-            #    temp.append(int(index))
-            
-            #idx.extend([tuple(temp)])
-            #print(idx)
-            #time.sleep(5)
-            #for index in label:
-                #labels.extend(label[index])
-            #labels.extend(label)
-        #train_batch["idx"] = idx
-        #batch_out["labels"] = torch.as_tensor(labels)
-
         outputs = self(**train_batch)
+        print(outputs.size())
+        print(train_batch["labels"].size())
         
-        
-        loss = F.cross_entropy(outputs.view(-1, self.num_labels),labels.view(-1),ignore_index=-100)
+        loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
         self.log('train_loss', loss)
         return loss
     
@@ -121,8 +91,7 @@ class WSD(pl.LightningModule):
             # ** operator converts batch items in named arguments, (e.g. 'input_ids', 'attention_mask_ids' ...), taken as input by the model forward pass
         
         labels = val_batch['labels']
-        #print(batch)
-        #time.sleep(5)
+        
         outputs = self(**batch)
         
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),labels.view(-1),ignore_index=-100)
