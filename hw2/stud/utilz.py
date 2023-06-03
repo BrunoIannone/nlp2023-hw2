@@ -6,26 +6,27 @@ import torch
 import time
 import numpy as np
 import evaluate
+import copy
 # we will use with Distil-BERT
 #language_model_name = "distilbert-base-uncased"
 # this GPU should be enough for this task to handle 32 samples per batch
 BATCH = 128
 # we keep num_workers = min(4 * number of GPUs, number of cores)
 # tells the data loader how many sub-processes to use for data loading
-num_workers = 1
+num_workers = 12
 # optim
 learning_rate = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
 # training
-epochs = 50
+epochs = 3
 device = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)
-tokenizer =  AutoTokenizer.from_pretrained("bert-base-cased")
+tokenizer =  AutoTokenizer.from_pretrained("bert-base-cased", use_fast = False)
 #tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-seqeval = evaluate.load("seqeval")
+seqeval = evaluate.load("f1")
 
 def build_data_from_jsonl(file_path:str): 
     """Split the JSONL file in file_path in sentences and relative labels 
@@ -130,15 +131,17 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
         list: list of integers that represent labels indexes
     """
     
-
+    labels = copy.deepcopy(labels)
+    
     for label in labels:
-        #print(labels)
-        #print(label)
+        
+
         temp = []
-        for value in labels[label]:
-            
-            temp.append(labels_to_idx[value])
-        labels[label] = temp
+        #print(labels[label])
+        labels[label] = labels_to_idx[labels[label][0]]
+            #temp.append(labels_to_idx[value])
+        #print(labels)
+       #labels[label] = temp
         #print(labels)
         #time.sleep(5)
 
@@ -165,7 +168,7 @@ def build_all_senses(file_path):
     return senses
 
 def collate_fn(batch):
-    print("COLLATOOOOO")
+    #print("COLLATOOOOO")
     
     batch_out = tokenizer(
         [sentence["sample"]["words"] for sentence in batch],
@@ -183,33 +186,29 @@ def collate_fn(batch):
     return batch_out
 
 def compute_metrics(labels,outputs,label_list):
-    """ outputs = outputs.argmax(dim=1)
+    outputs = outputs.argmax(dim=1)
     #print(outputs)
     y_true = labels.tolist()
     y_pred = outputs.tolist()
     predictions, labels = [], []
-
+    #print(y_pred)
     true_predictions = [
-        [label_list[p] for (p, l) in zip(pred, gold_label) if l != -100 ]
-        for pred, gold_label in zip(y_pred, y_true)
+        [label_list[p] for (p, l) in zip(y_pred, y_true) if l != -100 ]
+        
     ]
     true_labels = [
-        [label_list[l] for (p, l) in zip(pred, gold_label) if l != -100]
-        for pred, gold_label in zip(y_pred, y_true)
+        [label_list[l] for (p, l) in zip(y_pred, y_true) if l != -100]
+        
     ]
     predictions += true_predictions
     labels += true_labels
 
 
 
-    results = seqeval.compute(predictions=predictions, references=labels)
-    return {
-        "precision": results["overall_precision"],
-        "recall": results["overall_recall"],
-        "f1": results["overall_f1"],
-        "accuracy": results["overall_accuracy"],
-    } """
-    return 5
+    
+    return seqeval.compute(predictions=y_pred, references=y_true, average = 'macro')
+         
+     
 
 
 def extract_labels_and_senses_index(batch):
@@ -228,10 +227,7 @@ def extract_labels_and_senses_index(batch):
         for index in label:
             #print("index: " + str(index))
             temp.append(int(index))
-            if(len(label[index])>1):
-                labels.append(label[index][0])
-            else:
-                labels.extend(label[index])
+            labels.append(label[index])
             #print("List: " + str(labels))
         idx.append(torch.tensor(temp))
         #time.sleep(5)

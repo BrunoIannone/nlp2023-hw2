@@ -8,6 +8,7 @@ import os
 from torch import optim, nn, utils, Tensor
 import pytorch_lightning as pl
 import time
+import torchmetrics
 
 
 class WSD(pl.LightningModule):
@@ -24,7 +25,7 @@ class WSD(pl.LightningModule):
         self.classifier = torch.nn.Linear(
             self.transformer_model.config.hidden_size, num_labels, bias=True
         )
-        
+        self.f1 = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='macro')
     def forward(
         self,
         idx,
@@ -67,7 +68,7 @@ class WSD(pl.LightningModule):
         #print("OUTPUT: " + str(transformers_outputs["hidden_states"]))
         res = utilz.get_senses_vector(x,idx )
         
-        logits = self.classifier(res)
+        logits = F.log_softmax(self.classifier(res),dim = 1)
         #print("LOGITS: " + str(logits.size()))
                 
         return logits
@@ -79,22 +80,19 @@ class WSD(pl.LightningModule):
         return optimizer
     def training_step(self,train_batch,batch_idx):
         outputs = self(**train_batch)
-        print(outputs.size())
-        print(train_batch["labels"].size())
+        #print(outputs.size())
+        #print(train_batch["labels"].size())
         
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss,batch_size=utilz.BATCH)
         return loss
     
     def validation_step(self, val_batch,idx):
-        batch = {k: v for k, v in val_batch.items()}
-            # ** operator converts batch items in named arguments, (e.g. 'input_ids', 'attention_mask_ids' ...), taken as input by the model forward pass
+        outputs = self(**val_batch)
+        #print(outputs.size())
+        #print(val_batch["labels"].size())
         
-        labels = val_batch['labels']
-        
-        outputs = self(**batch)
-        
-        loss = F.cross_entropy(outputs.view(-1, self.num_labels),labels.view(-1),ignore_index=-100)
-        self.log('val_loss', loss) 
-    
-        print(utilz.compute_metrics(labels,outputs,self.label_list))
+        loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
+        self.log('val_loss', loss,batch_size=utilz.BATCH) 
+        self.log('f1', self.f1(outputs,val_batch["labels"]))
+        #print(utilz.compute_metrics(val_batch["labels"],outputs,self.label_list))
