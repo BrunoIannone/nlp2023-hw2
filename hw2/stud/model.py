@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModel
 import utilz
-import os
 import pytorch_lightning as pl
 import time
 import torchmetrics
@@ -53,7 +52,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         transformers_outputs = transformers_outputs[0]
         
         res = utilz.get_senses_vector(transformers_outputs,idx )
-        
+        res = self.dropout(res)
         logits = F.log_softmax(self.classifier(res),dim = 1)
                 
         return logits
@@ -61,7 +60,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
     
     def configure_optimizers(self):
             
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=utilz.LEARNING_RATE)
         return optimizer
     def training_step(self,train_batch,batch_idx):
 
