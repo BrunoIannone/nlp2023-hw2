@@ -6,41 +6,49 @@ class Vocabulary():
     """Vocabulary class
     """
 
-    def __init__(self, sentences: List[List[str]], labels: List[List[str]], save_vocab: bool = False):
+    def __init__(self, sentences: List[List[str]], labels: List[List[str]], save_vocab: bool = False, build_tokens_vocabulary: bool = False):
         """Init function for the vocabulary class
 
         Args:
             sentences (List[List[str]]): List of list of sentence tokens
             labels (List[List[str]]): List of list of sentences token labels
             save_vocab (bool, optional): True if the vocabulary needs to be saved (as .txt). Defaults to False.
-
+            build_tokens_vocabulary (bool, optional): True if word_to_idx and idx_to_word vocabularies are needed. Default to False
 
 
         """
-        token_vocabulary = self.build_tokens_vocabulary(sentences)
+        if build_tokens_vocabulary: ## Useful to be false when working with pre-trained models to avoid these computations
+            token_vocabulary = self.build_tokens_vocabulary(sentences)
 
-        self.word_to_idx = token_vocabulary["word_to_idx"]
-        self.idx_to_word = token_vocabulary["idx_to_word"]
+            self.word_to_idx = token_vocabulary["word_to_idx"]
+            self.idx_to_word = token_vocabulary["idx_to_word"]
 
         labels_vocabulary = self.build_labels_vocabulary(labels)
 
         self.labels_to_idx = labels_vocabulary["labels_to_idx"]
         self.idx_to_labels = labels_vocabulary["idx_to_labels"]
+        
         if save_vocab:
-            with open("word_to_idx.txt", "a") as fp:
-                json.dump(self.word_to_idx, fp)
-                fp.close()
-            with open("idx_to_word.txt", "a") as fp:
-                json.dump(self.idx_to_word, fp)
-                fp.close()
-            with open("labels_to_idx.txt", "a") as fp:
-                json.dump(self.labels_to_idx, fp)
-                fp.close()
+            self.save_routine()
+        
 
-            with open("idx_to_labels.txt", "a") as fp:
-                json.dump(self.idx_to_labels, fp)
-                fp.close()
+    
+    def save_routine(self):
+        
+        with open("word_to_idx.txt", "a") as fp:
+            json.dump(self.word_to_idx, fp)
+            fp.close()
+        with open("idx_to_word.txt", "a") as fp:
+            json.dump(self.idx_to_word, fp)
+            fp.close()
+        with open("labels_to_idx.txt", "a") as fp:
+            json.dump(self.labels_to_idx, fp)
+            fp.close()
 
+        with open("idx_to_labels.txt", "a") as fp:
+            json.dump(self.idx_to_labels, fp)
+            fp.close()
+    
     def build_tokens_vocabulary(self, sentences: List[List[str]]):
         """Create two different vocabularies from sentence tokens for word to vocabulary index and viceversa
         N.B. Padding will have index 0 while unknown words index 1.

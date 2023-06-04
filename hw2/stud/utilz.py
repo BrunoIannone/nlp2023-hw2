@@ -7,35 +7,29 @@ import time
 import numpy as np
 import evaluate
 import copy
-# we will use with Distil-BERT
-#language_model_name = "distilbert-base-uncased"
-# this GPU should be enough for this task to handle 32 samples per batch
-BATCH = 128
-# we keep num_workers = min(4 * number of GPUs, number of cores)
-# tells the data loader how many sub-processes to use for data loading
-num_workers = 12
-# optim
-learning_rate = 1e-3
+BATCH_SIZE = 8
+NUM_WORKERS = 12
+LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-# training
-epochs = 4
-device = "cuda" if torch.cuda.is_available() else "cpu"
+NUM_EPOCHS = 4
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)
-tokenizer =  AutoTokenizer.from_pretrained("bert-base-cased", use_fast = False)
-#tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-seqeval = evaluate.load("f1")
+TOKENIZER =  AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast = False)
 
-def build_data_from_jsonl(file_path:str): 
-    """Split the JSONL file in file_path in sentences and relative labels 
+def build_data_from_json(file_path:str): 
+    """Retrieve samples and sample sentences from JSON file
 
     Args:
-        file_path (string): path to JSONL file
+        file_path (string): path to JSON file
 
     Returns:
-        dictionary: return a dictionary with keys "sentences" and "labels" having as value list of list of strings: {sentences: List[list[sentences]], labels: List[List[labels]]}
+        dictionary: {
+            samples: List[{"instance_ids": {"id" (int): str}, "lemmas": List[str], "words": List[str], "pos_tags" = List[str], "senses": {"word_index" (int): List[str] (senses)},"candidates": {"word_index" (int): List[str](candidate senses)}}], 
+            words: List[List[str]]
+        }
     """
     try:
         f = open(file_path, 'r')
@@ -52,51 +46,14 @@ def build_data_from_jsonl(file_path:str):
     data = json.load(f)
     for json_line in data:
         samples.append({"instance_ids": data[json_line]["instance_ids"],"lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],"pos_tags": data[json_line]["pos_tags"],"senses":data[json_line]["senses"],"candidates":data[json_line]["candidates"]})
-        words.append(data[json_line]["words"])
-        #print(data[json_line]["words"])
-        #time.sleep(5)
-        #candidates.append(data[json_line]["candidates"])
-
-        #lemmas.append(data[json_line]["lemmas"])
-        #pos_tags.append(data[json_line]["pos_tags"])
-        #senses.append(data[json_line]["senses"])
-        
-        #instance_ids.append(data[json_line]["instance_ids"])
-        
-    
+        words.append(data[json_line]["words"])    
     f.close()
 
     return {
         "samples": samples,
         "words": words
-        #'instance_ids': instance_ids,
-        #'lemmas': lemmas,
-        #'pos_tags': pos_tags,
-        #'senses': senses,
-        #'words': words,
-        #'candidates': candidates
-
     }
 
-def list_all_values(data:List[dict],key:str):
-    """Take a list of dictionaries and return al list of all the values 
-
-    Args:
-        data (List[dict]): list of dict 
-        key (str): key of the dict to process
-
-    Returns:
-        List[str]: List containing all the values
-    """
-    #print(data)
-    time.sleep(5)
-    if key not in data:
-        raise "NOT VALID INPUT KEY, KEY NOT FOUND IN DICTIONARY"
-    labels = []
-    for candidate in data[key]:
-        for key in candidate:
-            labels.append(candidate[key])
-    return labels
 
 def word_to_idx(word_to_idx:dict,sentence:List[str]):
     """Converts tokens of strings in their indexes. If a token is unknown, its index is the <unk> key value
@@ -168,9 +125,8 @@ def build_all_senses(file_path):
     return senses
 
 def collate_fn(batch):
-    #print("COLLATOOOOO")
     
-    batch_out = tokenizer(
+    batch_out = TOKENIZER(
         [sentence["sample"]["words"] for sentence in batch],
         return_tensors="pt",
         padding=True,
@@ -184,29 +140,6 @@ def collate_fn(batch):
     batch_out["idx"] = idx
     
     return batch_out
-
-def compute_metrics(labels,outputs,label_list):
-    outputs = outputs.argmax(dim=1)
-    #print(outputs)
-    y_true = labels.tolist()
-    y_pred = outputs.tolist()
-    predictions, labels = [], []
-    #print(y_pred)
-    true_predictions = [
-        [label_list[p] for (p, l) in zip(y_pred, y_true) if l != -100 ]
-        
-    ]
-    true_labels = [
-        [label_list[l] for (p, l) in zip(y_pred, y_true) if l != -100]
-        
-    ]
-    predictions += true_predictions
-    labels += true_labels
-
-
-
-    
-    return seqeval.compute(predictions=y_pred, references=y_true, average = 'macro')
          
      
 
