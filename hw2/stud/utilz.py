@@ -20,7 +20,7 @@ weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
 # training
-epochs = 3
+epochs = 4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "bert-base-cased"
 DIRECTORY_NAME = os.path.dirname(__file__)

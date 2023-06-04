@@ -35,7 +35,7 @@ valid_dataloader = DataLoader(valid_dataset,batch_size=utilz.BATCH,collate_fn=ut
 #test_dataloader = DataLoader(test_dataset,batch_size=utils.batch_size,collate_fn=utils.collate_fn,shuffle=False)
 
 model = mod.WSD(utilz.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=False)
-logger = TensorBoardLogger("lightning_logs/" , name="giacomo")
+logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"lightning_logs/") , name="giacomo")
 trainer = pl.Trainer(max_epochs = utilz.epochs,callbacks=EarlyStopping(monitor="val_loss",patience=5),logger=logger)
 trainer.fit(model,train_dataloader,valid_dataloader)
 
