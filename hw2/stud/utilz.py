@@ -11,11 +11,11 @@ LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-NUM_EPOCHS = 4
+NUM_EPOCHS = 5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 DIRECTORY_NAME = os.path.dirname(__file__)
-TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=False)
+TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True)
 
 
 def build_data_from_json(file_path: str):
@@ -84,19 +84,11 @@ def label_to_idx(labels_to_idx: dict, labels: List[str]):
         dict: {"word_index": List[int](senses)}, a word could be associated with more senses, the first one is taken in account
         """
 
-    # labels = copy.deepcopy(labels)
     res = {}
     for label in labels:
 
-        # print(labels[label])
-        # take the first valid sense for the word
         res[label] = labels_to_idx[labels[label][0]]
-        # temp.append(labels_to_idx[value])
-        # print(labels)
-       # labels[label] = temp
-        # print(labels)
-        # time.sleep(5)
-
+        
     return res
 
 
@@ -127,7 +119,8 @@ def build_all_senses(file_path):
 
 
 def collate_fn(batch):
-
+    #print("cazzo")
+    #time.sleep(5)
     batch_out = TOKENIZER(
         [sentence["sample"]["words"] for sentence in batch],
         return_tensors="pt",

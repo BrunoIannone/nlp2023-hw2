@@ -9,8 +9,9 @@ import pytorch_lightning as pl
 import utilz
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-
-
+from pytorch_lightning.profilers import PyTorchProfiler
+import datamodule
+import torch
 training_data = utilz.build_data_from_json(
     os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/train_coarse_grained.json'))
 
@@ -21,19 +22,13 @@ valid_data = utilz.build_data_from_json(
 
 senses = utilz.build_all_senses(os.path.join(utilz.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
 
-
-
 vocab = vocabulary.Vocabulary(training_data["words"],senses)
 
-train_dataset = wsddataset.WsdDataset(training_data["samples"],vocab.labels_to_idx)
-valid_dataset = wsddataset.WsdDataset(valid_data["samples"],vocab.labels_to_idx)
-#test_dataset = wsddataset.WsdDataset(test_data["words"],test_data["senses"],vocab.labels_to_idx)
-train_dataloader = DataLoader(train_dataset,batch_size=utilz.BATCH_SIZE,collate_fn=utilz.collate_fn,shuffle=False, num_workers=utilz.NUM_WORKERS)
-valid_dataloader = DataLoader(valid_dataset,batch_size=utilz.BATCH_SIZE,collate_fn=utilz.collate_fn,shuffle=False,num_workers=utilz.NUM_WORKERS)
-#test_dataloader = DataLoader(test_dataset,batch_size=utils.BATCH_SIZE,collate_fn=utils.collate_fn,shuffle=False,num_workers=utilz.NUM_WORKERS)
+dm = datamodule.WsdDataModule(training_data,valid_data,vocab.labels_to_idx)
 
 model = mod.WSD(utilz.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
-logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"lightning_logs/") , name="giacomo")
-trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=EarlyStopping(monitor="val_loss",patience=5),logger=logger)
-trainer.fit(model,train_dataloader,valid_dataloader)
+logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs"))
+profiler = PyTorchProfiler(on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),trace_memory = True)
+trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=EarlyStopping(monitor="val_loss", patience=10),logger=logger, profiler=profiler)
+trainer.fit(model,datamodule = dm)
 

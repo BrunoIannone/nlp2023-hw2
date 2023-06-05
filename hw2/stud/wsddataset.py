@@ -28,35 +28,21 @@ class WsdDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, index: int):
-        #print(index)
-        #print(self.samples[0:5])
-        #time.sleep(100)
+        
         """Get item for dataloader input
 
         Args:
             index (int): index-th sample to access
 
         Returns:
-            tuple: (List[token indexes (int)], List[labels indexes (int)]) of the index-th element
+            dict: {"sample": sample_dict, List[sense indexes (int)]} related to the index-th element
         """
-        """ id = self.samples[index]["id"]
-        print(id)
-        sentence = self.samples[index]["words"]
-        print(sentence)
-        labels = self.samples[index]["label"]
-
-        print(labels)
-        print("OPATCHKI")  
-        #time.sleep(5)
- """
-        #print(self.samples[index])
-        #time.sleep(5)
+        
+        
         return {
             
             "sample": self.samples[index],
             "senses": utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
     
         }
-            #'tokens': self.samples[index]["words"],
-            #'ner_tags': utils.label_to_idx(self.labels_to_idx, self.samples[index]["label"])
-    
+           
