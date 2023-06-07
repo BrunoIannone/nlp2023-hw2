@@ -23,12 +23,15 @@ valid_data = utilz.build_data_from_json(
 senses = utilz.build_all_senses(os.path.join(utilz.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
 
 vocab = vocabulary.Vocabulary(training_data["words"],senses)
-
+#print(vocab.idx_to_labels)
 dm = datamodule.WsdDataModule(training_data,valid_data,vocab.labels_to_idx)
 
 model = mod.WSD(utilz.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
 logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs"))
 profiler = PyTorchProfiler(on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),trace_memory = True)
-trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=EarlyStopping(monitor="val_loss", patience=10),logger=logger, profiler=profiler)
+trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=EarlyStopping(monitor="val_loss", patience=5),logger=logger, profiler=profiler)
+#trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,logger=logger, profiler=profiler)
+
 trainer.fit(model,datamodule = dm)
+trainer.validate(model,datamodule=dm)
 

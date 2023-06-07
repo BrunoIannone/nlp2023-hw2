@@ -14,17 +14,20 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         self.num_labels = num_labels
         self.label_list = label_list
         # layers
-        self.transformer_model = AutoModel.from_pretrained(language_model_name, output_hidden_states=True)
+        
+        self.transformer_model = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
+        print(self.transformer_model)
+        time.sleep(10)
         if not fine_tune_lm:
             for param in self.transformer_model.parameters():
                 param.requires_grad = False
-        self.dropout = torch.nn.Dropout(0.2)
+        self.dropout = torch.nn.Dropout(0.8)
         self.classifier = torch.nn.Linear(
             self.transformer_model.config.hidden_size, num_labels, bias=True
         )
         
-        self.relu = torch.nn.ReLU()
-        self.val_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='macro')
+        #self.relu = torch.nn.ReLU()
+        self.val_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
     def forward(
         self,
         idx,
@@ -50,32 +53,57 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         
         transformers_outputs = self.transformer_model(**model_kwargs)
         
-        transformers_outputs = transformers_outputs[0]
+        #transformers_outputs = transformers_outputs[0]
         
-        res = utilz.get_senses_vector(transformers_outputs,idx )
-        
-        res = self.dropout(res)
-        logits = self.relu(res)
-        logits = F.log_softmax(self.classifier(res),dim = 1)
+        #res = utilz.get_senses_vector(transformers_outputs,idx )
+        transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
+        transformers_outputs_sum = self.dropout(transformers_outputs_sum)
+        transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx )
+        #res = self.dropout(res)
+        #logits = self.relu(res)
+        logits = self.classifier(transformers_outputs_sum)        
+        #logits = F.log_softmax(self.classifier(res),dim = 1)
+        #logits = F.log_softmax(res,dim = 1)
+
                 
         return logits
 
     
     def configure_optimizers(self):
-            
-        optimizer = torch.optim.Adam(self.parameters(), lr=utilz.LEARNING_RATE)
+        groups = [
+            {
+                "params": self.classifier.parameters(),
+                "lr": utilz.LEARNING_RATE,
+                "weight_decay": utilz.weight_decay,
+            },
+            {
+                "params": self.transformer_model.parameters(),
+                "lr": utilz.transformer_learning_rate,
+                "weight_decay": utilz.transformer_weight_decay,
+            },
+        ]           
+        optimizer = torch.optim.Adam(groups)
         return optimizer
+    
     def training_step(self,train_batch,batch_idx):
 
         outputs = self(**train_batch)
+        #print(outputs)
+        #time.sleep(10)
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
-        self.log_dict({'train_loss':loss},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        #loss = F.cross_entropy(outputs.view(-1),train_batch["labels"].view(-1),ignore_index=-100)
         
+        self.log_dict({'train_loss':loss},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        return loss
         
 
     def validation_step(self, val_batch,idx):
         outputs = self(**val_batch)
+        #print(outputs.size())
         y_pred = outputs.argmax(dim = 1)
+        #print(val_batch["labels"].size())
+       
+       
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
         self.val_metric(y_pred,val_batch["labels"])
         self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)

@@ -11,7 +11,7 @@ LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 DIRECTORY_NAME = os.path.dirname(__file__)
@@ -127,6 +127,7 @@ def collate_fn(batch):
         padding=True,
         # We use this argument because the texts in our dataset are lists of words.
         is_split_into_words=True,
+        truncation=True
     )
 
     labels, idx = extract_labels_and_sense_indices(batch)
@@ -211,10 +212,12 @@ def get_senses_vector(model_output, tensor_idx):
 
         for elem in range(len(idx[i])):
 
-            y = torch.stack(
-                (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
-            sum = torch.sum(y, dim=-2)
-            res.append(sum)
+            #y = torch.stack(
+            #    (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
+            #sum = torch.sum(y, dim=-2)
+            #res.append(sum)
+            res.append(model_output[i][idx[i][elem]])
+            
 
     res = torch.stack(res, dim=-2)
     return res
