@@ -22,7 +22,7 @@ class WsdDataModule(LightningDataModule):
             self.train_dataset,
             batch_size = utilz.BATCH_SIZE,
             num_workers = utilz.NUM_WORKERS,
-            shuffle = False,
+            shuffle = True,
             collate_fn=utilz.collate_fn
         ) 
     def val_dataloader(self):

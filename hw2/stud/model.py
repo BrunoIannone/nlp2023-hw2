@@ -31,6 +31,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
     def forward(
         self,
         idx,
+        word_ids,
         input_ids: torch.Tensor = None,
         attention_mask: torch.Tensor = None,
         token_type_ids: torch.Tensor = None,
@@ -60,7 +61,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         #print("OUTPUT: " + str(transformers_outputs_sum.size()))
         #time.sleep(5)
         transformers_outputs_sum = self.dropout(transformers_outputs_sum)
-        transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx )
+        transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
         #res = self.dropout(res)
         #logits = self.relu(res)
         

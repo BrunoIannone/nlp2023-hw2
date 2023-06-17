@@ -5,7 +5,7 @@ from transformers import AutoTokenizer
 import torch
 import time
 import copy
-BATCH_SIZE = 128
+BATCH_SIZE = 8
 NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
@@ -13,8 +13,10 @@ transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
-#LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+#LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
+#LANGUAGE_MODEL_NAME = "roberta-base"
+
+LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 DIRECTORY_NAME = os.path.dirname(__file__)
 TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True)
 
@@ -135,8 +137,33 @@ def collate_fn(batch):
         is_split_into_words=True,
         truncation=True
     )
+    word_ids = []
+    for idx,sentence in enumerate(batch):
+        word_ids.append(batch_out.word_ids(batch_index=idx))
     
+    last_index = None
+    res = []
+    i = 0
+    for l in word_ids:
+        i = 0
+        temp = []
+        last_index = None
+        while(i<len(l)):
+            if last_index != None and l[last_index] == l[i]:
+                i +=1
+
+                continue
+            else:
+                temp.append(i)
+                last_index = i
+                i+=1 
+        res.append(torch.tensor(temp))   
+
+    word_ids_ = torch.nn.utils.rnn.pad_sequence(
+        res, batch_first=True, padding_value=-1)
     labels, idx = extract_labels_and_sense_indices(batch)
+
+    batch_out["word_ids"] = word_ids_
     batch_out["labels"] = labels
     batch_out["idx"] = idx
 
@@ -202,7 +229,7 @@ def get_idx_from_tensor(tensor_idx):
     return idx
 
 
-def get_senses_vector(model_output, tensor_idx):
+def get_senses_vector(model_output, tensor_idx, word_ids):
     """This function extracts the vector embedding for each target word for each sentence
 
     Args:
@@ -228,7 +255,18 @@ def get_senses_vector(model_output, tensor_idx):
 
             #time.sleep(5)
             #res.append(model_output[i][0])
-            res.append(model_output[i][idx[i][elem]])
+            original_index = idx[i][elem]
+            #print("orig:" + str(original_index))
+            shifted_index = int(word_ids[i][original_index])
+            #print("Shift: " + str(shifted_index))
+            lenght = int(word_ids[i][original_index + 1]) - int(word_ids[i][original_index]) 
+            #print(lenght)
+            #time.sleep(5)
+            stack = torch.stack([model_output[i][shifted_index : shifted_index + lenght]],dim = 1)
+            #print(stack.size())
+            #time.sleep(2)
+            res.append(torch.sum(stack,dim = 0).squeeze())
+            #print(res)
             
 
     res = torch.stack(res, dim=-2)
