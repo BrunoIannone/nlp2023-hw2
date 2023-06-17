@@ -5,15 +5,16 @@ from transformers import AutoTokenizer
 import torch
 import time
 import copy
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-NUM_EPOCHS = 10
+NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
+#LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 DIRECTORY_NAME = os.path.dirname(__file__)
 TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True)
 
@@ -37,16 +38,20 @@ def build_data_from_json(file_path: str):
     # line = f.readline()
     words = []
     samples = []
+    labels = []
     data = json.load(f)
     for json_line in data:
         samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
                        "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
         words.append(data[json_line]["words"])
+        #temp = [data[json_line]["candidates"][sense] for sense in data[json_line]["candidates"]]
+        #labels.extend(temp)
     f.close()
 
     return {
         "samples": samples,
-        "words": words
+        "words": words,
+        #"labels":labels
     }
 
 
@@ -119,7 +124,8 @@ def build_all_senses(file_path):
 
 
 def collate_fn(batch):
-    #print("cazzo")
+    
+    
     #time.sleep(5)
     batch_out = TOKENIZER(
         [sentence["sample"]["words"] for sentence in batch],
@@ -129,7 +135,7 @@ def collate_fn(batch):
         is_split_into_words=True,
         truncation=True
     )
-
+    
     labels, idx = extract_labels_and_sense_indices(batch)
     batch_out["labels"] = labels
     batch_out["idx"] = idx
@@ -208,14 +214,20 @@ def get_senses_vector(model_output, tensor_idx):
     """
     idx = get_idx_from_tensor(tensor_idx)
     res = []
+    #print(model_output.size())
+    
     for i in range(model_output.size(0)):
+        #print(idx[i])
 
         for elem in range(len(idx[i])):
-
             #y = torch.stack(
             #    (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
             #sum = torch.sum(y, dim=-2)
             #res.append(sum)
+            #print(model_output[i][idx[i][elem]])
+
+            #time.sleep(5)
+            #res.append(model_output[i][0])
             res.append(model_output[i][idx[i][elem]])
             
 

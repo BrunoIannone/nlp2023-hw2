@@ -16,8 +16,8 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         # layers
         
         self.transformer_model = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
-        print(self.transformer_model)
-        time.sleep(10)
+        #print(self.transformer_model)
+        #time.sleep(10)
         if not fine_tune_lm:
             for param in self.transformer_model.parameters():
                 param.requires_grad = False
@@ -57,10 +57,13 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         
         #res = utilz.get_senses_vector(transformers_outputs,idx )
         transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
+        #print("OUTPUT: " + str(transformers_outputs_sum.size()))
+        #time.sleep(5)
         transformers_outputs_sum = self.dropout(transformers_outputs_sum)
         transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx )
         #res = self.dropout(res)
         #logits = self.relu(res)
+        
         logits = self.classifier(transformers_outputs_sum)        
         #logits = F.log_softmax(self.classifier(res),dim = 1)
         #logits = F.log_softmax(res,dim = 1)

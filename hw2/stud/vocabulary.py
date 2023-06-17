@@ -85,6 +85,7 @@ class Vocabulary():
         }
 
     def build_labels_vocabulary(self, sentences_labels: List[List[str]]):
+        #print(sentences_labels)
         """Create two different vocabularies from sentence labels for label to vocabulary index and viceversa.
         N.B.: padding will have the bigger index
 
