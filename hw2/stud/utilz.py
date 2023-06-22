@@ -18,7 +18,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 DIRECTORY_NAME = os.path.dirname(__file__)
-TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True)
+TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True,add_prefix_space = True)
 
 
 def build_data_from_json(file_path: str):
@@ -125,9 +125,9 @@ def build_all_senses(file_path):
     return senses
 
 
-def collate_fn(batch):
+def collate_fn(batch,prediction):
     
-    
+    #print(batch)
     #time.sleep(5)
     batch_out = TOKENIZER(
         [sentence["sample"]["words"] for sentence in batch],
@@ -136,11 +136,13 @@ def collate_fn(batch):
         # We use this argument because the texts in our dataset are lists of words.
         is_split_into_words=True,
         truncation=True
+
     )
     word_ids = []
     for idx,sentence in enumerate(batch):
         word_ids.append(batch_out.word_ids(batch_index=idx))
-    
+    #print(word_ids)
+    #time.sleep(5)
     last_index = None
     res = []
     i = 0
@@ -164,6 +166,8 @@ def collate_fn(batch):
     labels, idx = extract_labels_and_sense_indices(batch)
 
     batch_out["word_ids"] = word_ids_
+    #print( batch_out["word_ids"])
+    #time.sleep(5)
     batch_out["labels"] = labels
     batch_out["idx"] = idx
 
@@ -271,3 +275,48 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
 
     res = torch.stack(res, dim=-2)
     return res
+
+def str_to_int(str_dict_key:dict):
+    """Function for dict keys conversion from str to int
+
+    Args:
+        str_dict_key (dict): dictionary with keys having str type
+
+    Returns:
+        dict: input dict with the same keys converted in integers
+    """
+    dict = {}
+    for key in str_dict_key:
+        dict[int(key)] = str_dict_key[key]
+    return dict
+
+
+def idx_to_label(idx_to_labels:dict, src_label:List[List[int]]):
+    """Converts list of labels indexes to their string value. It's the inverse operation of label_to_idx function
+
+    Args:
+        labels_to_idx (dict): dictionary with structure {label:index}
+        src_label (List[List[int]]): list of label indexes
+
+    Returns:
+        List[List[str]]: List of list of labels (strings)
+    """
+    print(src_label)
+    out_label = []
+    temp = []
+    #for label_list in src_label:
+        
+        #temp = []
+    for label in src_label:
+            
+        if '<pad>' == idx_to_labels[int(label)]:
+             out_label.append("O") 
+        else:
+           out_label.append(idx_to_labels[label])
+                    
+        
+
+    #out_label.append(temp)
+
+                  
+    return out_label

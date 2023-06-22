@@ -29,18 +29,19 @@ class Vocabulary():
         self.idx_to_labels = labels_vocabulary["idx_to_labels"]
         
         if save_vocab:
-            self.save_routine()
+            self.save_routine(build_tokens_vocabulary)
         
 
     
-    def save_routine(self):
+    def save_routine(self,build_tokens_vocabulary: bool = False):
         
-        with open("word_to_idx.txt", "a") as fp:
-            json.dump(self.word_to_idx, fp)
-            fp.close()
-        with open("idx_to_word.txt", "a") as fp:
-            json.dump(self.idx_to_word, fp)
-            fp.close()
+        if(build_tokens_vocabulary):
+            with open("word_to_idx.txt", "a") as fp:
+                json.dump(self.word_to_idx, fp)
+                fp.close()
+            with open("idx_to_word.txt", "a") as fp:
+                json.dump(self.idx_to_word, fp)
+                fp.close()
         with open("labels_to_idx.txt", "a") as fp:
             json.dump(self.labels_to_idx, fp)
             fp.close()

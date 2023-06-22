@@ -3,7 +3,8 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, STEP_OUTPUT, TRA
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel
-import utilz
+import stud.utilz as utilz
+#import utilz
 import pytorch_lightning as pl
 import time
 import torchmetrics
@@ -13,6 +14,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         super().__init__()
         self.num_labels = num_labels
         self.label_list = label_list
+        self.res = None
         # layers
         
         self.transformer_model = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
@@ -25,9 +27,13 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         self.classifier = torch.nn.Linear(
             self.transformer_model.config.hidden_size, num_labels, bias=True
         )
-        
         #self.relu = torch.nn.ReLU()
+        
         self.val_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
+        #self.test_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
+
+        self.save_hyperparameters()
+
     def forward(
         self,
         idx,
@@ -111,4 +117,25 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
         self.val_metric(y_pred,val_batch["labels"])
         self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+    
+    def test_step(self, test_batch,idx):
         
+        outputs = self(**test_batch)
+        y_pred = outputs.argmax(dim = 1)
+        predicted_labels = utilz.idx_to_label(
+                    self.label_list, y_pred.tolist())
+        print("RES: " + str(predicted_labels))
+        #loss = F.cross_entropy(outputs.view(-1, self.num_labels),test_batch["labels"].view(-1),ignore_index=-100)
+
+        #self.val_metric(y_pred,test_batch["labels"])
+        #self.log_dict({'test_loss':loss,'loss_f1': self.loss_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        self.res = predicted_labels
+        return self.res                
+
+    
+    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
+        outputs = self(**batch)
+        y_pred = outputs.argmax(dim = 1)
+        predicted_labels = utilz.idx_to_label(
+                    self.label_list, y_pred.tolist())
+        return predicted_labels

@@ -28,6 +28,7 @@ if __name__ == "__main__":
                 "words": ["Choose", "203", "business", "executives", "."],
                 'candidates': {"0": ["select.v.h.01", "preferred.v.h.01", "chosen.v.h.01"],
                                "3": ["executive.n.h.01"]}
+                
             }
         ]
     )

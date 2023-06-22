@@ -1,5 +1,7 @@
 from torch.utils.data import Dataset
-import utilz
+import stud.utilz as utilz
+#import  utilz
+
 from typing import List
 import torch 
 from transformers import AutoTokenizer
