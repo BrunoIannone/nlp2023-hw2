@@ -93,8 +93,10 @@ def label_to_idx(labels_to_idx: dict, labels: List[str]):
 
     res = {}
     for label in labels:
-
-        res[label] = labels_to_idx[labels[label][0]]
+        if labels[label][0] not in labels_to_idx:
+            res[label] = labels_to_idx['O']
+        else:
+            res[label] = labels_to_idx[labels[label][0]]
         
     return res
 
@@ -125,7 +127,7 @@ def build_all_senses(file_path):
     return senses
 
 
-def collate_fn(batch,prediction):
+def collate_fn(batch):
     
     #print(batch)
     #time.sleep(5)
@@ -206,6 +208,8 @@ def extract_labels_and_sense_indices(batch):
     labels = torch.as_tensor(labels)
 
     return labels, idx
+
+
 
 
 def get_idx_from_tensor(tensor_idx):
@@ -301,14 +305,14 @@ def idx_to_label(idx_to_labels:dict, src_label:List[List[int]]):
     Returns:
         List[List[str]]: List of list of labels (strings)
     """
-    print(src_label)
+    #print(src_label)
     out_label = []
     temp = []
     #for label_list in src_label:
         
         #temp = []
     for label in src_label:
-            
+        
         if '<pad>' == idx_to_labels[int(label)]:
              out_label.append("O") 
         else:

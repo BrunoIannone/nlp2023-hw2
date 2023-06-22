@@ -125,6 +125,8 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         predicted_labels = utilz.idx_to_label(
                     self.label_list, y_pred.tolist())
         print("RES: " + str(predicted_labels))
+        print(utilz.idx_to_label(
+                    self.label_list, test_batch["labels"].tolist()))
         #loss = F.cross_entropy(outputs.view(-1, self.num_labels),test_batch["labels"].view(-1),ignore_index=-100)
 
         #self.val_metric(y_pred,test_batch["labels"])

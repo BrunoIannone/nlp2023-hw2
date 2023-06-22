@@ -11,7 +11,8 @@ from typing import List
 import stud.wsddataset as wsddataset
 from torch.utils.data import DataLoader
 import torch
-
+import os
+import time
 def build_model(device: str) -> Model:
     # STUDENT: return StudentModel()
     # STUDENT: your model MUST be loaded on the device "device" indicates
@@ -39,10 +40,10 @@ class StudentModel(Model):
     def __init__(self):
         # Load your models/tokenizer/etc. that only needs to be loaded once when doing inference
         self.vocab = self.load_vocabularies(DIRECTORY_NAME)
-        print(self.vocab.keys())
+        #print(self.vocab.keys())
         self.LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
         
-        self.TOKENIZER = AutoTokenizer.from_pretrained(self.LANGUAGE_MODEL_NAME, use_fast=True,add_prefix_space = True)
+        self.TOKENIZER = AutoTokenizer.from_pretrained(os.path.join(utilz.DIRECTORY_NAME, '../../model/GlossBERT'), use_fast=True,add_prefix_space = True)
         #self.model = wsd_model.WSD(LANGUAGE_MODEL_NAME,len(self.vocab.labels_to_idx.keys()),self.vocab.idx_to_labels, fine_tune_lm=True)
         self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(
             DIRECTORY_NAME, 'glossbert2_0.884.ckpt'))
@@ -76,38 +77,31 @@ class StudentModel(Model):
             fp.close()
         return vocab
     def predict(self, sentences: List[Dict]) -> List[List[str]]:
-        print(sentences)
-        # STUDENT: implement here your predict function
-        # remember to respect the same order of tokens!
-        res = []
+        #print(sentences)
+        #time.sleep(5)
         trainer = pl.Trainer()
-
-        #for elem in sentences:
-            #elem = {"sample":{"words":elem["words"]},"senses": elem["senses"]}           
-            #print(elem["sample"]["words"])
-            ##test_data = utilz.collate_fn([elem])
-            #res.extend(trainer.predict(self.model,test_data))
-        test_data = self.dict_to_dataset(sentences)
-        
-        
-        #elem = self.dict_to_dataset(sentences)
-        #elem = elem["samples"]
-        test_dataset = wsddataset.WsdDataset(test_data["samples"],self.vocab["labels_to_idx"])
-
-        #print(elem)
-
-        #elem = [{"sample":{"words":elem["words"]},"senses": utilz.label_to_idx(self.vocab["labels_to_idx"],elem["senses"])}]
-        test =  DataLoader(
-            test_dataset,
-            batch_size = utilz.BATCH_SIZE,
-            num_workers = 1,#utilz.NUM_WORKERS,
+        res = []
+        samples = []
+        for json_line in sentences:
+            samples = []
+            samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
+                        "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
+            test_data = wsddataset.WsdDataset(samples,self.vocab["labels_to_idx"])
+            test_dataloader = DataLoader(
+            test_data,
+            batch_size = 1,
+            num_workers = utilz.NUM_WORKERS,
             shuffle = False,
             collate_fn=utilz.collate_fn
         )
-        #trainer.predict(self.model,dataloaders=test)
-        res = trainer.predict(self.model,test)
+            #temp = {"sample": samples[0],"senses":utilz.label_to_idx(self.vocab["labels_to_idx"], samples[0]["senses"]) }
+            #print(temp)
+            #batch = utilz.collate_fn([temp])
+            #print(batch)
+            res.extend(trainer.predict(self.model,test_dataloader))
+        print(res)
+        time.sleep(5)
         return res
-
     def dict_to_dataset(self, batch):
 
         words = []
@@ -115,13 +109,10 @@ class StudentModel(Model):
         labels = []
         
         for json_line in batch:
-            if( "senses" in list(json_line.keys())):
-                samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
-                            "pos_tags": json_line["pos_tags"], "senses": json_line["senses"], "candidates": json_line["candidates"]})
-            else: 
-                samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
-                            "pos_tags": json_line["pos_tags"], "senses": [{-1:["<pad>"]}], "candidates": json_line["candidates"]})
-
+            
+            samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
+                        "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
+        
 
         return {
             "samples": samples,
@@ -131,7 +122,7 @@ class StudentModel(Model):
         
     def collate_fn(self,batch):
     
-        print(batch)
+        #print(batch)
         #time.sleep(5)
         batch_out = self.TOKENIZER(
             [sentence["sample"]["words"] for sentence in batch],
@@ -145,7 +136,7 @@ class StudentModel(Model):
         word_ids = []
         for idx,sentence in enumerate(batch):
             word_ids.append(batch_out.word_ids(batch_index=idx))
-        print(word_ids)
+        #print(word_ids)
         last_index = None
         res = []
         i = 0

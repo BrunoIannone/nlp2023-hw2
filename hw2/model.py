@@ -1,34 +1,15 @@
-from pprint import pp
 from typing import List, Dict
 
-from stud.implementation import build_model
 
-
-def main(sentences: List[Dict]):
-
-    model = build_model("cpu")
-    predicted_sentences = model.predict(sentences)
-
-    for sentence, predicted_labels_wsd in zip(sentences, predicted_sentences):
-        print("Sentence dict:")
-        pp(sentence)
-        print()
-        print("Predicted senses:")
-        pp(predicted_labels_wsd)
-        print()
-
-
-if __name__ == "__main__":
-    main([
-            {
-                "id": "d000.s032",
-                "instance_ids": {"0": "d000.s032.t000", "3": "d000.s032.t001"},
-                "lemmas": ["choose", "203", "business", "executive", "."],
-                "pos_tags": ["VERB", "NUM", "NOUN", "NOUN", "."],
-                "words": ["Choose", "203", "business", "executives", "."],
-                'candidates': {"0": ["select.v.h.01", "preferred.v.h.01", "chosen.v.h.01"],
-                               "3": ["executive.n.h.01"]}},
-            {"id": "d000.s000",
+class Model:
+    def predict(self, sentences: List[Dict]) -> List[List[str]]:
+        """
+        A simple wrapper for your model
+        Args: sentences: list of sentences with words to disambiguate. Each sentence is represented with a dict.
+        Ex. of input list containing two sentences:
+            [
+                {
+                    "id": "d000.s000",
                     "instance_ids": {
                         "9": "d000.s000.t000",
                         "11": "d000.s000.t001",
@@ -325,5 +306,13 @@ if __name__ == "__main__":
                             "found.v.h.14"
                         ]
                     }
-                }    
-    ])
+                }
+            ]
+        Returns:
+            list of list of predictions associated to each word to disambiguate in the input sentences.
+            Ex: [
+                    ["naming.v.h.01", "research.n.h.01", "reported.v.h.01"],
+                    ["comment.n.h.01", "connote.v.h.01", "discovered.v.h.01", "cause.n.h.01", "found.v.h.03"]
+                ]
+        """
+        raise NotImplementedError
