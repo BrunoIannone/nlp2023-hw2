@@ -16,9 +16,11 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 #LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 #LANGUAGE_MODEL_NAME = "roberta-base"
 
-LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+#LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+
 DIRECTORY_NAME = os.path.dirname(__file__)
-TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_NAME, use_fast=True,add_prefix_space = True)
+LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME,'../../model/GlossBERT')
+TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_PATH, use_fast=True,add_prefix_space = True)
 
 
 def build_data_from_json(file_path: str):

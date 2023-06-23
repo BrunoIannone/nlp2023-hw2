@@ -43,10 +43,9 @@ class StudentModel(Model):
         #print(self.vocab.keys())
         self.LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
         
-        self.TOKENIZER = AutoTokenizer.from_pretrained(os.path.join(utilz.DIRECTORY_NAME, '../../model/GlossBERT'), use_fast=True,add_prefix_space = True)
+        self.TOKENIZER = AutoTokenizer.from_pretrained(utilz.LANGUAGE_MODEL_PATH, use_fast=True,add_prefix_space = True)
         #self.model = wsd_model.WSD(LANGUAGE_MODEL_NAME,len(self.vocab.labels_to_idx.keys()),self.vocab.idx_to_labels, fine_tune_lm=True)
-        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(
-            DIRECTORY_NAME, 'glossbert2_0.884.ckpt'))
+        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME, 'glossbert2_0.884.ckpt'))
     
     def load_vocabularies(self, path: str,tokens_vocab = False):
         """_summary_
@@ -77,7 +76,7 @@ class StudentModel(Model):
             fp.close()
         return vocab
     def predict(self, sentences: List[Dict]) -> List[List[str]]:
-        #print(sentences)
+        """ #print(sentences)
         #time.sleep(5)
         trainer = pl.Trainer()
         res = []
@@ -99,9 +98,27 @@ class StudentModel(Model):
             #batch = utilz.collate_fn([temp])
             #print(batch)
             res.extend(trainer.predict(self.model,test_dataloader))
-        print(res)
-        time.sleep(5)
+        #print(res)
+        #time.sleep(5)
+        return res  """
+        self.model.eval()
+        samples = []
+        res = []
+        for json_line in sentences:
+            samples = []
+
+            samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
+                        "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
+            temp = {"sample": samples[0],"senses":utilz.label_to_idx(self.vocab["labels_to_idx"], samples[0]["senses"]) }
+            print(temp)
+            batch = utilz.collate_fn([temp]).to(utilz.DEVICE)
+            y_pred = self.model(**batch)
+            y_pred = y_pred.argmax(dim = 1)
+            predicted_labels = utilz.idx_to_label(
+                    list(self.vocab["labels_to_idx"].keys()), y_pred.tolist())
+            res.append(predicted_labels)
         return res
+
     def dict_to_dataset(self, batch):
 
         words = []
