@@ -6,7 +6,7 @@ class Vocabulary():
     """Vocabulary class
     """
 
-    def __init__(self, sentences: List[List[str]], labels: List[List[str]], save_vocab: bool = False, build_tokens_vocabulary: bool = False):
+    def __init__(self,labels: List[List[str]], sentences: List[List[str]] = None, save_vocab: bool = False, build_tokens_vocabulary: bool = False):
         """Init function for the vocabulary class
 
         Args:

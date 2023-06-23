@@ -2,4 +2,8 @@
 /hw2/stud/__init__.py
 /logs/server.stdout
 /hw2/stud/__pycache__/
+/hw2/__pycache__/
+/hw2/lightning_logs/
 /hw2/stud/lightning_logs/
+b-profiler/
+.vscode/

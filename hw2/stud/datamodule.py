@@ -4,7 +4,7 @@ import utilz
 import wsddataset
 
 class WsdDataModule(LightningDataModule):
-    def __init__(self,training_data, valid_data, test_data,labels_to_idx) -> None:
+    def __init__(self,training_data, valid_data, test_data,labels_to_idx):
         super().__init__()
     
         self.training_data = training_data

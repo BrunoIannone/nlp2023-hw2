@@ -3,19 +3,15 @@ import stud.utilz as utilz
 #import  utilz
 
 from typing import List
-import torch 
-from transformers import AutoTokenizer
-from transformers import DataCollatorForTokenClassification
 import time
 class WsdDataset(Dataset):
     """WSD dataset class
     """
-    def __init__(self, samples, labels_to_idx: dict):
+    def __init__(self, samples: List[dict], labels_to_idx: dict):
         """Constructor for the WSD dataset
 
         Args:
-            sentences (List[List[str]]): List of list of sentence tokens
-            labels (List[List[str]]): List of list of sentences token labels
+            samples (List[dict]): List of samples dict {"instance_ids": [instance_ids], "lemmas": [lemmas], "words": [words], "pos_tags": [pos_tags], "senses": [senses], "candidates":[candidates]}
             labels_to_idx (dict): dictionary with structure {label:index}
         """
         
@@ -27,6 +23,11 @@ class WsdDataset(Dataset):
     
 
     def __len__(self):
+        """Return samples length
+
+        Returns:
+            int: length of samples list (number of samples)_
+        """
         return len(self.samples)
 
     def __getitem__(self, index: int):
@@ -37,14 +38,15 @@ class WsdDataset(Dataset):
             index (int): index-th sample to access
 
         Returns:
-            dict: {"sample": sample_dict, List[sense indexes (int)]} related to the index-th element
+            dict: {"sample": sample_dict} related to the index-th element with senses converted into their indices
         """
         
-        
+        #converte index-th sample senses in indices
+        self.samples[index]["senses"] = utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
         return {
             
             "sample": self.samples[index],
-            "senses": utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
+            #"senses": utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
     
         }
            

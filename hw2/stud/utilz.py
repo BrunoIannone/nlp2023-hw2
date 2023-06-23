@@ -4,7 +4,7 @@ from typing import List
 from transformers import AutoTokenizer
 import torch
 import time
-import copy
+
 BATCH_SIZE = 8
 NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
@@ -13,50 +13,63 @@ transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-#LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
-#LANGUAGE_MODEL_NAME = "roberta-base"
 
-#LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+# LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
+# LANGUAGE_MODEL_NAME = "roberta-base"
+# LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 
 DIRECTORY_NAME = os.path.dirname(__file__)
-LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME,'../../model/GlossBERT')
-TOKENIZER = AutoTokenizer.from_pretrained(LANGUAGE_MODEL_PATH, use_fast=True,add_prefix_space = True)
+LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME, '../../model/GlossBERT')
+TOKENIZER = AutoTokenizer.from_pretrained(
+    LANGUAGE_MODEL_PATH, use_fast=True, add_prefix_space=True)
 
 
-def build_data_from_json(file_path: str):
-    """Retrieve samples and sample sentences from JSON file
+def build_data_from_json(file_path: str, save_words: bool = False):
+    """Retrieve samples and sample sentences from JSON file (if save_words = True)
 
     Args:
         file_path (string): path to JSON file
-
+        save_words (bool) : save samples' sentences
     Returns:
-        dictionary: {
-            samples: List[{"instance_ids": {"id" (int): str}, "lemmas": List[str], "words": List[str], "pos_tags" = List[str], "senses": {"word_index" (int): List[str] (senses)},"candidates": {"word_index" (int): List[str](candidate senses)}}], 
-            words: List[List[str]]
-        }
+        if (save_words = True)
+            dictionary: {
+                samples: List[{"instance_ids": {"id" (int): str}, "lemmas": List[str], "words": List[str], "pos_tags" = List[str], "senses": {"word_index" (int): List[str] (senses)},"candidates": {"word_index" (int): List[str](candidate senses)}}], 
+                words: List[List[str]]
+            } 
+        else:
+            dictionary: {
+                samples: List[{"instance_ids": {"id" (int): str}, "lemmas": List[str], "words": List[str], "pos_tags" = List[str], "senses": {"word_index" (int): List[str] (senses)},"candidates": {"word_index" (int): List[str](candidate senses)}}], 
+
+            }
+
     """
     try:
         f = open(file_path, 'r')
     except OSError:
         print("Unable to open file in " + str(file_path))
-    # line = f.readline()
-    words = []
+    if (save_words):
+        words = []
     samples = []
-    labels = []
     data = json.load(f)
     for json_line in data:
         samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
                        "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
-        words.append(data[json_line]["words"])
-        #temp = [data[json_line]["candidates"][sense] for sense in data[json_line]["candidates"]]
-        #labels.extend(temp)
+        if (save_words):
+            words.append(data[json_line]["words"])
+
     f.close()
 
-    return {
-        "samples": samples,
-        "words": words,
-        #"labels":labels
-    }
+    if (not save_words):
+        return {
+            "samples": samples,
+
+        }
+    else:
+        return {
+            "samples": samples,
+            "words": words,
+
+        }
 
 
 def word_to_idx(word_to_idx: dict, sentence: List[str]):
@@ -99,7 +112,7 @@ def label_to_idx(labels_to_idx: dict, labels: List[str]):
             res[label] = labels_to_idx['O']
         else:
             res[label] = labels_to_idx[labels[label][0]]
-        
+
     return res
 
 
@@ -125,28 +138,49 @@ def build_all_senses(file_path):
         senses.append([json_line])
 
     f.close()
-    # print(senses)
     return senses
 
 
-def collate_fn(batch):
-    
-    #print(batch)
-    #time.sleep(5)
+def collate_fn(batch: List[dict]):
+    """collate_fn for DataLoader
+
+    Args:
+        batch (List[dict]): List of samples' 
+
+    Returns:
+        dict: { "word_ids" = word_ids,"labels" = labels,"idx" = idx} all values are tensors
+    """
     batch_out = TOKENIZER(
         [sentence["sample"]["words"] for sentence in batch],
         return_tensors="pt",
         padding=True,
-        # We use this argument because the texts in our dataset are lists of words.
         is_split_into_words=True,
         truncation=True
 
     )
+    word_ids = map_new_index(batch, batch_out) #needed to take in account the words shift after tokenization
+    labels, idx = extract_labels_and_sense_indices(batch) #extract word indices and relative label
+
+    batch_out["word_ids"] = word_ids
+    batch_out["labels"] = labels
+    batch_out["idx"] = idx
+
+    return batch_out
+
+
+def map_new_index(batch:List[dict], batch_out:dict):
+    """Aux function for callate_fn: recovers word_ids from tokenized sentences
+
+    Args:
+        batch (List[dict]): List of samples' 
+        batch_out (dict): batch after tokenization
+
+    Returns:
+        Tensor: word_ids for each sample words
+    """
     word_ids = []
-    for idx,sentence in enumerate(batch):
+    for idx, sentence in enumerate(batch):
         word_ids.append(batch_out.word_ids(batch_index=idx))
-    #print(word_ids)
-    #time.sleep(5)
     last_index = None
     res = []
     i = 0
@@ -154,35 +188,27 @@ def collate_fn(batch):
         i = 0
         temp = []
         last_index = None
-        while(i<len(l)):
+        while (i < len(l)):
             if last_index != None and l[last_index] == l[i]:
-                i +=1
+                i += 1
 
                 continue
             else:
                 temp.append(i)
                 last_index = i
-                i+=1 
-        res.append(torch.tensor(temp))   
+                i += 1
+        res.append(torch.tensor(temp))
 
     word_ids_ = torch.nn.utils.rnn.pad_sequence(
-        res, batch_first=True, padding_value=-1)
-    labels, idx = extract_labels_and_sense_indices(batch)
-
-    batch_out["word_ids"] = word_ids_
-    #print( batch_out["word_ids"])
-    #time.sleep(5)
-    batch_out["labels"] = labels
-    batch_out["idx"] = idx
-
-    return batch_out
+        res, batch_first=True, padding_value=-1) # -1 is the chosen pad value
+    return word_ids_
 
 
-def extract_labels_and_sense_indices(batch):
-    """Extract labels (senses) and target word indices for all the sentenses
+def extract_labels_and_sense_indices(batch: List[dict]) -> tuple: # tuple of tensors(labels,indices)
+    """Extract labels (senses) and target word indices for all the sentences
 
     Args:
-        batch (dict): sample dict
+        batch ( List[dict]): sample dict
 
     Returns:
         tuple: (labels , indices) both values are tensors
@@ -192,7 +218,7 @@ def extract_labels_and_sense_indices(batch):
     # print(labels)
     for sentence in batch:
         # print(sentence)
-        label = sentence["senses"]
+        label = sentence["sample"]["senses"]
         # print("Senses: " + str(label))
         temp = []
         for index in label:
@@ -212,14 +238,12 @@ def extract_labels_and_sense_indices(batch):
     return labels, idx
 
 
-
-
-def get_idx_from_tensor(tensor_idx):
-    """Recover the word indices of the words to disambiguate from tensor_idx.
-    Is an auxiliary function for get_senses_vector
+def get_idx_from_tensor(tensor_idx)-> List[tuple]:
+    """Aux function for get_senses_vector: recover the word indices of the words to disambiguate from tensor_idx.
+    
 
     Args:
-        tensor_idx (Tensor): Tensor containig target words for each sentence
+        tensor_idx (Tensor): Tensor containig target words indices for each sentence
 
     Returns:
         List[tuple]: one tuple for each sentence containing the indices for target words
@@ -229,7 +253,7 @@ def get_idx_from_tensor(tensor_idx):
         # print(row)
         temp = []
         for elem in row:
-            if elem == -1:
+            if elem == -1: # -1 is the chosen pad value
                 break
             temp.append(int(elem))
         idx.append(tuple(temp))
@@ -240,7 +264,7 @@ def get_idx_from_tensor(tensor_idx):
 
 
 def get_senses_vector(model_output, tensor_idx, word_ids):
-    """This function extracts the vector embedding for each target word for each sentence
+    """This function extracts the vector embedding for each target words for each sentence
 
     Args:
         model_output (Tensor): transformer output tensor
@@ -251,38 +275,39 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
     """
     idx = get_idx_from_tensor(tensor_idx)
     res = []
-    #print(model_output.size())
-    
+    # print(model_output.size())
+
     for i in range(model_output.size(0)):
-        #print(idx[i])
+        # print(idx[i])
 
         for elem in range(len(idx[i])):
-            #y = torch.stack(
+            # y = torch.stack(
             #    (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
-            #sum = torch.sum(y, dim=-2)
-            #res.append(sum)
-            #print(model_output[i][idx[i][elem]])
+            # sum = torch.sum(y, dim=-2)
+            # res.append(sum)
+            # print(model_output[i][idx[i][elem]])
 
-            #time.sleep(5)
-            #res.append(model_output[i][0])
+            # time.sleep(5)
+            # res.append(model_output[i][0])
             original_index = idx[i][elem]
-            #print("orig:" + str(original_index))
+            # print("orig:" + str(original_index))
             shifted_index = int(word_ids[i][original_index])
-            #print("Shift: " + str(shifted_index))
-            lenght = int(word_ids[i][original_index + 1]) - int(word_ids[i][original_index]) 
-            #print(lenght)
-            #time.sleep(5)
-            stack = torch.stack([model_output[i][shifted_index : shifted_index + lenght]],dim = 1)
-            #print(stack.size())
-            #time.sleep(2)
-            res.append(torch.sum(stack,dim = 0).squeeze())
-            #print(res)
-            
+            # print("Shift: " + str(shifted_index))
+            lenght = int(word_ids[i][original_index + 1]) - shifted_index
+            # print(lenght)
+            # time.sleep(5)
+            stack = torch.stack(
+                [model_output[i][shifted_index: shifted_index + lenght]], dim=1)
+            # print(stack.size())
+            # time.sleep(2)
+            res.append(torch.sum(stack, dim=0).squeeze())
+            # print(res)
 
     res = torch.stack(res, dim=-2)
     return res
 
-def str_to_int(str_dict_key:dict):
+
+def str_to_int(str_dict_key: dict) ->dict :
     """Function for dict keys conversion from str to int
 
     Args:
@@ -297,7 +322,7 @@ def str_to_int(str_dict_key:dict):
     return dict
 
 
-def idx_to_label(idx_to_labels:dict, src_label:List[List[int]]):
+def idx_to_label(idx_to_labels: dict, src_label: List[List[int]]) -> List[List[str]]:
     """Converts list of labels indexes to their string value. It's the inverse operation of label_to_idx function
 
     Args:
@@ -307,22 +332,19 @@ def idx_to_label(idx_to_labels:dict, src_label:List[List[int]]):
     Returns:
         List[List[str]]: List of list of labels (strings)
     """
-    #print(src_label)
+    # print(src_label)
     out_label = []
     temp = []
-    #for label_list in src_label:
-        
-        #temp = []
+    # for label_list in src_label:
+
+    # temp = []
     for label in src_label:
-        
+
         if '<pad>' == idx_to_labels[int(label)]:
-             out_label.append("O") 
+            out_label.append("O")
         else:
-           out_label.append(idx_to_labels[label])
-                    
-        
+            out_label.append(idx_to_labels[label])
 
-    #out_label.append(temp)
+    # out_label.append(temp)
 
-                  
     return out_label
