@@ -50,6 +50,7 @@ def read_dataset(path: str) -> Tuple[List[Dict], List[List[List[str]]]]:
         assert (all(gt_sense in candidates for gt_sense in gt)
                 for gt, candidates in zip(sentence_data["senses"].values(), sentence_data["candidates"].values()))
         assert len(sentence_data["words"]) == len(sentence_data["lemmas"]) == len(sentence_data["pos_tags"])
+        print("SENSI" + str(sentence_data['senses']))
         senses_s.append(list(sentence_data.pop("senses").values()))
         sentence_data["id"] = sentence_id
         sentences_s.append(sentence_data)
@@ -73,7 +74,7 @@ def main(test_path: str, endpoint: str, batch_size=32):
         logging.error(e, exc_info=True)
         exit(1)
 
-    max_try = 10
+    max_try = 15
     iterator = iter(range(max_try))
 
     while True:

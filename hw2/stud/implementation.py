@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Dict
 import stud.wsd_model as wsd_model
 from model import Model
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer,AutoModel
 import os
 import stud.utilz as utilz
 import json
@@ -20,7 +20,7 @@ def build_model(device: str) -> Model:
     return StudentModel(device)
 
 DIRECTORY_NAME = os.path.dirname(__file__)
-
+print(os.path.join(DIRECTORY_NAME, '../../model/GlossBERT/'))
 class RandomBaseline(Model):
 
     def __init__(self):
@@ -43,10 +43,14 @@ class StudentModel(Model):
         #print(self.vocab.keys())
         self.LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
         self.device = device
-        self.TOKENIZER = AutoTokenizer.from_pretrained(utilz.LANGUAGE_MODEL_PATH, use_fast=True,add_prefix_space = True)
-        #self.model = wsd_model.WSD(LANGUAGE_MODEL_NAME,len(self.vocab.labels_to_idx.keys()),self.vocab.idx_to_labels, fine_tune_lm=True)
-        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME, 'glossbert2_0.884.ckpt'),map_location=self.device)
-    
+        #self.TOKENIZER = AutoTokenizer.from_pretrained(os.path.join(DIRECTORY_NAME, '../../model/GlossBERT'), use_fast=False,add_prefix_space = True, )
+        print("Giacomo")
+        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/glossbert2_0.884.ckpt'),map_location=self.device)
+        #self.model.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/epoch=2-step=4629.ckpt'),map_location=self.device)
+
+        self.model.eval()
+        print("Giacomino")
+
     def load_vocabularies(self, path: str,tokens_vocab = False):
         """_summary_
 
@@ -88,7 +92,17 @@ class StudentModel(Model):
         return res
     
     def predict_(self,json_line):
+        unknown_candidates = []
+        for candidate in json_line["candidates"]:
+            if json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()):
+                #print(json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()))
+
+                unknown_candidates.append(0)
+
+            else:
+                unknown_candidates.append(json_line["candidates"][candidate][0])
         json_line["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], json_line["candidates"])
+        print("HERE" + str(unknown_candidates))
         #samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
         #            "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
         json_line = {"sample": json_line}
@@ -99,6 +113,14 @@ class StudentModel(Model):
         y_pred = y_pred.argmax(dim = 1)
         predicted_labels = utilz.idx_to_label(
         list(self.vocab["labels_to_idx"].keys()), y_pred.tolist())
+        print(predicted_labels)
+        for i in range(len(unknown_candidates)):
+            if unknown_candidates[i] == 0:
+                continue
+            else:
+                predicted_labels[i] = unknown_candidates[i]
+        print(predicted_labels)
+        print("----------")
         return predicted_labels
     
     def dict_to_dataset(self, batch):

@@ -6,22 +6,22 @@ import torch
 import time
 
 BATCH_SIZE = 8
-NUM_WORKERS = 12
+NUM_WORKERS = 1
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-NUM_EPOCHS = 100
+NUM_EPOCHS = 2
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 # LANGUAGE_MODEL_NAME = "roberta-base"
-# LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 
 DIRECTORY_NAME = os.path.dirname(__file__)
 LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME, '../../model/GlossBERT')
 TOKENIZER = AutoTokenizer.from_pretrained(
-    LANGUAGE_MODEL_PATH, use_fast=True, add_prefix_space=True)
+    LANGUAGE_MODEL_NAME, use_fast=True, add_prefix_space=True)
 
 
 def build_data_from_json(file_path: str, save_words: bool = False):
@@ -93,26 +93,55 @@ def word_to_idx(word_to_idx: dict, sentence: List[str]):
     return res
 
 
-def label_to_idx(labels_to_idx: dict, labels: List[str]):
+def label_to_idx(labels_to_idx: dict, labels_idx_dict: List[str]):
     # print(labels)
     """Converts labels string in integer indexes. 
 
 
     Args:
         labels_to_idx (dictionary): dictionary with structure {label:index} 
-        labels (dict): {"word_index": List[str](senses)}
+        labels_idx_dict (dict): {"word_index": List[str](senses)}
 
     Returns:
         dict: {"word_index": List[int](senses)}, a word could be associated with more senses, the first one is taken in account
         """
 
     res = {}
-    for label in labels:
-        if labels[label][0] not in labels_to_idx:
-            res[label] = labels_to_idx['O']
-        else:
-            res[label] = labels_to_idx[labels[label][0]]
+    #print("Labels_dict")
+    #print(labels_idx_dict)
+    #time.sleep(2)
+    modificato = False
+    for word_idx in labels_idx_dict:
+        #print(word_idx)
+        #time.sleep(10)
+        if labels_idx_dict[word_idx][0] not in list(labels_to_idx.keys()) and len(labels_idx_dict[word_idx])<=1 :
+            #print("NO")
+            #print(labels_idx_dict)
+            #time.sleep(10)
+            res[word_idx] = labels_to_idx['O']
+        elif len(labels_idx_dict[word_idx])>1: ##in un futuro qua vanno usati i gloss
+            for sense in labels_idx_dict[word_idx]:
+                #print("SENSE" +str(sense))
+                if sense in labels_to_idx:
+                    #print("SI>1")
+                    #print(labels_idx_dict[word_idx])
+                    #print(sense)
+                    res[word_idx] = labels_to_idx[sense]
+                    #print(res)
+                    #time.sleep(10)
+                    modificato = True
+                    break
+            if not modificato:
+                res[word_idx] = labels_to_idx['O']
+            
 
+                    
+        
+        else:
+            #print("GIA")
+            res[word_idx] = labels_to_idx[labels_idx_dict[word_idx][0]]
+    #print("RES" + str(res))
+    #time.sleep(20)
     return res
 
 
