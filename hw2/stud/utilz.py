@@ -5,18 +5,19 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 8
-NUM_WORKERS = 1
+BATCH_SIZE = 2
+NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0.0
-NUM_EPOCHS = 2
+NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 # LANGUAGE_MODEL_NAME = "roberta-base"
 LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+LANGUAGE_MODEL_NAME_POS =  'QCRI/bert-base-multilingual-cased-pos-english'
 
 DIRECTORY_NAME = os.path.dirname(__file__)
 LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME, '../../model/GlossBERT')

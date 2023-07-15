@@ -29,17 +29,18 @@ vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
 #vocab = vocabulary.Vocabulary(training_data["words"],senses,save_vocab=False)
 
 #MODEL RELATED INITIALIZATIONS
+
 dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
 
-#model = mod.WSD(utilz.LANGUAGE_MODEL_NAME, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
-model = mod.WSD.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/glossbert2_0.884.ckpt'),map_location='cpu')
+model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,utilz.LANGUAGE_MODEL_NAME_POS, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
+#model = mod.WSD.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/glossbert2_0.884.ckpt'),map_location='cpu')
 logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs"))
 #profiler = PyTorchProfiler(on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),trace_memory = True)
-trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/'))],logger=logger,accelerator='gpu')
+trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/'))],logger=logger,accelerator='gpu', profiler='simple')
 #trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,logger=logger, profiler=profiler)
 
 #START TRAINING ROUTINE
-#trainer.fit(model,datamodule = dm)
+trainer.fit(model,datamodule = dm)
 #trainer.validate(model,datamodule=dm)
 trainer.test(model,datamodule = dm)
 #model = mod.WSD.load_from_checkpoint

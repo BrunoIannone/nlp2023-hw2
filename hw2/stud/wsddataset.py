@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
-import stud.utilz as utilz
-#import  utilz
+#import stud.utilz as utilz
+import  utilz
 
 from typing import List
 import time
