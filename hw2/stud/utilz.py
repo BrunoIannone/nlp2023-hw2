@@ -5,8 +5,8 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 2
-NUM_WORKERS = 12
+BATCH_SIZE = 1
+NUM_WORKERS = 1
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
@@ -199,22 +199,23 @@ def collate_fn(batch: List[dict]):
 
 
 def map_new_index(batch:List[dict], batch_out:dict):
-    """Aux function for callate_fn: recovers word_ids from tokenized sentences
+    """Aux function for collate_fn: recovers the new word indices after the tokenization
 
     Args:
-        batch (List[dict]): List of samples' 
-        batch_out (dict): batch after tokenization
+        batch (List[dict]): List of samples
+        batch_out (dict): batch after word tokenization
 
     Returns:
-        Tensor: word_ids for each sample words
+        Tensor: new sentens word indices after tokenization
     """
     word_ids = []
     for idx, sentence in enumerate(batch):
         word_ids.append(batch_out.word_ids(batch_index=idx))
+
     last_index = None
     res = []
     i = 0
-    for l in word_ids:
+    for l in word_ids: #the code below saves in how meny subwords a word has been divided. As they will have the same index, we can recover when each word start after the tokenization
         i = 0
         temp = []
         last_index = None
@@ -298,8 +299,8 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
 
     Args:
         model_output (Tensor): transformer output tensor
-        tensor_idx (Tensor): Tensor containing all sentence target word indices
-
+        tensor_idx (Tensor): Tensor where each row contains all sentence original target word indices
+        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after suubwords tokenizations)
     Returns:
         Tensor: The stacked tensor of all target words embedding
     """
@@ -321,13 +322,16 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
             # res.append(model_output[i][0])
             original_index = idx[i][elem]
             # print("orig:" + str(original_index))
+            print(word_ids)
+            time.sleep(100)
             shifted_index = int(word_ids[i][original_index])
             # print("Shift: " + str(shifted_index))
-            lenght = int(word_ids[i][original_index + 1]) - shifted_index
+            next_word = int(word_ids[i][original_index + 1])
+            word_lenght = next_word - shifted_index
             # print(lenght)
             # time.sleep(5)
             stack = torch.stack(
-                [model_output[i][shifted_index: shifted_index + lenght]], dim=1)
+                [model_output[i][shifted_index: shifted_index + word_lenght]], dim=1)
             # print(stack.size())
             # time.sleep(2)
             res.append(torch.sum(stack, dim=0).squeeze())
