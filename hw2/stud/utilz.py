@@ -5,7 +5,7 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 8
+BATCH_SIZE = 2048
 NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
 weight_decay = 0.0

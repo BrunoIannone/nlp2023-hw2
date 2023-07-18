@@ -10,6 +10,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.profilers import PyTorchProfiler
 import datamodule
 import torch
+import lstm
+import lstm_utils as utils
 
 
 #JSON DATA PROCESSING
@@ -37,8 +39,9 @@ vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
 #MODEL RELATED INITIALIZATIONS
 
 dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
-
-model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,utilz.LANGUAGE_MODEL_NAME_POS, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
+model = lstm.Lstm_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,
+                          50265, len(vocab.labels_to_idx), utils.LAYERS_NUM, None)
+#model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,utilz.LANGUAGE_MODEL_NAME_POS, len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
 #model = mod.WSD.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/glossbert2_0.884.ckpt'),map_location='cpu')
 logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/roberta"))
 #profiler = PyTorchProfiler(on_trace_ready = torch.profiler.tensorboard_trace_handler(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/profiler0")),trace_memory = True, schedule = torch.profiler.schedule(skip_first=10,wait=1,warmup=1,active=20))

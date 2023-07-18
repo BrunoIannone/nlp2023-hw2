@@ -10,7 +10,7 @@ import torchmetrics
 import utilz
 
 class Lstm_WSD(pl.LightningModule):
-    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, labels_num: int, layers_num: int, device: str, embedding):
+    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, num_labels: int, layers_num: int, embedding):
 
         super().__init__()
 
@@ -20,13 +20,13 @@ class Lstm_WSD(pl.LightningModule):
         embedding_dim (int): Embedding dimension
         hidden_dim (int): Hidden dimension
         vocab_size (int): Vocabulary size
-        labels_num (int): Number of classes
+        num_labels (int): Number of classes
         layers_num (int): Number of layers of the LSTM
         device (str): Device for calculation
         """
         self.layers_num = layers_num
         self.hidden_dim = hidden_dim
-        self.device = device
+        self.num_labels = num_labels
 
         if(embedding):  # note that the vocabulary must have an entry for padding and unk
             self.word_embeddings = nn.Embedding.from_pretrained(
@@ -46,9 +46,9 @@ class Lstm_WSD(pl.LightningModule):
 
         if(utils.BIDIRECTIONAL):
 
-            self.hidden2labels = nn.Linear(2*hidden_dim, labels_num)
+            self.hidden2labels = nn.Linear(2*hidden_dim, num_labels)
         else:
-            self.hidden2labels = nn.Linear(hidden_dim, labels_num)
+            self.hidden2labels = nn.Linear(hidden_dim, num_labels)
         self.val_metric  = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
         self.test_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
 
@@ -75,7 +75,7 @@ class Lstm_WSD(pl.LightningModule):
         Returns:
             Tensor: Model predictions
         """
-        embeds = self.word_embeddings(sentence[0])
+        embeds = self.word_embeddings(input_ids)
         if(utils.DROPOUT_EMBED > 0):
             embeds = self.dropout_embed(embeds)
 
@@ -83,7 +83,7 @@ class Lstm_WSD(pl.LightningModule):
         #    embeds, sentence[1], batch_first=True, enforce_sorted=False)
 
         lstm_out, _ = self.lstm(embeds)
-        transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
+        output_padded = utilz.get_senses_vector(lstm_out,idx,word_ids )
 
         #output_padded, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
         #    lstm_out, batch_first=True)
@@ -107,10 +107,10 @@ class Lstm_WSD(pl.LightningModule):
             }
          ]
     def training_step(self, train_batch,idx) -> STEP_OUTPUT:
-        outputs = self.model(**train_batch)
+        outputs = self(**train_batch)
 
-        loss = F.cross_entropy(outputs.view(-1, self.labels_num),train_batch["labels"].view(-1),ignore_index=-100)
-        self.log_dict({'train_loss':loss},batch_size=utils.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
+        self.log_dict({'train_loss':loss},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
         return loss
     
     def validation_step(self, val_batch,idx):
@@ -122,7 +122,7 @@ class Lstm_WSD(pl.LightningModule):
        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
         self.val_metric(y_pred,val_batch["labels"])
-        self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utils.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
     def test_step(self, test_batch,idx):
         
         outputs = self(**test_batch)
