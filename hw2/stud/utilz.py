@@ -5,8 +5,8 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 1
-NUM_WORKERS = 1
+BATCH_SIZE = 8
+NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
 weight_decay = 0.0
 transformer_learning_rate = 1e-5
@@ -14,9 +14,9 @@ transformer_weight_decay = 0.0
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
-# LANGUAGE_MODEL_NAME = "roberta-base"
-LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+#LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
+LANGUAGE_MODEL_NAME = "roberta-base"
+#LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
 LANGUAGE_MODEL_NAME_POS =  'QCRI/bert-base-multilingual-cased-pos-english'
 
 DIRECTORY_NAME = os.path.dirname(__file__)
@@ -319,22 +319,23 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
             # print(model_output[i][idx[i][elem]])
 
             # time.sleep(5)
-            # res.append(model_output[i][0])
-            original_index = idx[i][elem]
+            res.append(model_output[i][0])
+            
+            ##SCOMMENTA DA QUI
+            #original_index = idx[i][elem]
             # print("orig:" + str(original_index))
-            print(word_ids)
-            time.sleep(100)
-            shifted_index = int(word_ids[i][original_index])
+            
+            #shifted_index = int(word_ids[i][original_index])
             # print("Shift: " + str(shifted_index))
-            next_word = int(word_ids[i][original_index + 1])
-            word_lenght = next_word - shifted_index
+            #next_word = int(word_ids[i][original_index + 1])
+            #word_lenght = next_word - shifted_index
             # print(lenght)
             # time.sleep(5)
-            stack = torch.stack(
-                [model_output[i][shifted_index: shifted_index + word_lenght]], dim=1)
+            #stack = torch.stack(
+            #    [model_output[i][shifted_index: shifted_index + word_lenght]], dim=1)
             # print(stack.size())
             # time.sleep(2)
-            res.append(torch.sum(stack, dim=0).squeeze())
+            #res.append(torch.sum(stack, dim=0).squeeze())
             # print(res)
 
     res = torch.stack(res, dim=-2)

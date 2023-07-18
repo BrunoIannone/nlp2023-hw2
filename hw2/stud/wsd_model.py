@@ -73,8 +73,9 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         #time.sleep(5)
         #transformers_outputs_total_sum = self.dropout(transformers_outputs_total_sum)
         #transformers_outputs_total_sum = utilz.get_senses_vector(transformers_outputs_total_sum,idx,word_ids )
-        transformers_outputs_sum = self.dropout(transformers_outputs_sum)
         transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
+
+        transformers_outputs_sum = self.dropout(transformers_outputs_sum)
         #res = self.dropout(res)
         #logits = self.relu(res)
         
@@ -98,12 +99,13 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
                 "params": self.transformer_model.parameters(),
                 "lr": utilz.transformer_learning_rate,
                 "weight_decay": utilz.transformer_weight_decay,
-            },
-            {
-                "params": self.transformer_pos_model.parameters(),
-                "lr": utilz.transformer_learning_rate,
-                "weight_decay": utilz.transformer_weight_decay,
             }
+            #""",
+             #{
+              #  "params": self.transformer_pos_model.parameters(),
+               # "lr": utilz.transformer_learning_rate,
+                #"weight_decay": utilz.transformer_weight_decay,
+            #} """
         ]           
         optimizer = torch.optim.Adam(groups)
         return optimizer
