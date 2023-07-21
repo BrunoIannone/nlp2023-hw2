@@ -49,4 +49,3 @@ class WsdDataset(Dataset):
             #"senses": utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
     
         }
-           

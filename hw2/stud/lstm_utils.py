@@ -4,11 +4,12 @@ import json
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from typing import List
+import time
 
 ###HYPERPARAMETERS###
-EMBEDDING_DIM = 25
+EMBEDDING_DIM = 1024
 LAYERS_NUM = 2
-HIDDEN_DIM = 150
+HIDDEN_DIM = 50
 EPOCHS_NUM = 500
 LEARNING_RATE = 0.01
 CHANCES = 5
@@ -181,5 +182,92 @@ def str_to_int(str_dict_key:dict):
         dict[int(key)] = str_dict_key[key]
     return dict
 
+from allennlp.modules.elmo import batch_to_ids
+import utilz
+def collate_fn_elmo(batch):
+    batch_out = {}
+    batch_out["input_ids"] = batch_to_ids([sentence["sample"]["words"] for sentence in batch])
+    #print(batch_out["input_ids"].size())
+    #time.sleep(10)
+    labels, idx = utilz.extract_labels_and_sense_indices(batch)
+    batch_out["labels"] = labels
+    batch_out["idx"] = idx
+    return batch_out
 
-   
+def get_idx_from_tensor(tensor_idx)-> List[tuple]:
+    """Aux function for get_senses_vector: recover the word indices of the words to disambiguate from tensor_idx.
+    
+
+    Args:
+        tensor_idx (Tensor): Tensor containig target words indices for each sentence
+
+    Returns:
+        List[tuple]: one tuple for each sentence containing the indices for target words
+    """
+    idx = []
+    for row in tensor_idx:
+        # print(row)
+        temp = []
+        for elem in row:
+            if elem == -1: # -1 is the chosen pad value
+                break
+            temp.append(int(elem))
+        idx.append(tuple(temp))
+        # print(idx)
+        # time.sleep(2)
+
+    return idx
+
+def get_senses_vector(model_output, tensor_idx, word_ids):
+    """This function extracts the vector embedding for each target words for each sentence
+
+    Args:
+        model_output (Tensor): transformer output tensor
+        tensor_idx (Tensor): Tensor where each row contains all sentence original target word indices
+        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after suubwords tokenizations)
+    Returns:
+        Tensor: The stacked tensor of all target words embedding
+    """
+    #print(model_output.size())
+    #time.sleep(10)
+    idx = get_idx_from_tensor(tensor_idx)
+    res = []
+    # print(model_output.size())
+
+    for i in range(model_output.size(0)):
+        # print(idx[i])
+        #print(model_output[i].size())
+        #time.sleep(10)
+
+        for elem in range(len(idx[i])):
+            # y = torch.stack(
+            #    (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
+            # sum = torch.sum(y, dim=-2)
+            # res.append(sum)
+            # print(model_output[i][idx[i][elem]])
+
+            # time.sleep(5)
+            #res.append(model_output[i][0])
+            
+            ##SCOMMENTA DA QUI
+            original_index = idx[i][elem]
+            # print("orig:" + str(original_index))
+            
+            #shifted_index = int(word_ids[i][original_index])
+            # print("Shift: " + str(shifted_index))
+            #next_word = int(word_ids[i][original_index + 1])
+            #word_lenght = next_word - shifted_index
+            # print(lenght)
+            # time.sleep(5)
+            #print(model_output[i][original_index].size())
+            #time.sleep(5)
+            #stack = torch.stack(
+            #    [model_output[i][original_index]], dim=1)
+            # print(stack.size())
+            # time.sleep(2)
+            #res.append(torch.sum(stack, dim=0).squeeze())
+            res.append(model_output[i][original_index])
+            # print(res)
+
+    res = torch.stack(res, dim=-2)
+    return res
