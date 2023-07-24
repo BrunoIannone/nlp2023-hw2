@@ -2,21 +2,22 @@ from typing import Any, Optional
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, STEP_OUTPUT, TRAIN_DATALOADERS
 import torch
 import torch.nn.functional as F
-from transformers import AutoModel
+from transformers import AutoModel, BertForTokenClassification,AutoModelForTokenClassification,optimization
+
 #import stud.utilz as utilz
 import utilz
 import pytorch_lightning as pl
 import time
 import torchmetrics
 
-class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
-    def __init__(self, language_model_name: str,language_model_name_pos: str, num_labels: int, label_list,fine_tune_lm: bool = True, *args, **kwargs) -> None:
+class WSD(pl.LightningModule): 
+    def __init__(self, language_model_name: str, num_labels: int, idx_to_labels:dict,fine_tune_lm: bool = True, *args, **kwargs) -> None:
         super().__init__()
         self.num_labels = num_labels
-        self.label_list = label_list
+        self.idx_to_labels = idx_to_labels
         # layers
         
-        self.transformer_model = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
+        self.transformer_model = AutoModelForTokenClassification.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
         #self.transformer_pos_model = AutoModel.from_pretrained(language_model_name_pos,output_hidden_states=True,num_labels = num_labels)
         #for param in self.transformer_pos_model.parameters():
         #        param.requires_grad = False
@@ -25,7 +26,7 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         if not fine_tune_lm:
             for param in self.transformer_model.parameters():
                 param.requires_grad = False
-        self.dropout = torch.nn.Dropout(0.8)
+        self.dropout = torch.nn.Dropout(0.6)
         self.classifier = torch.nn.Linear(
             self.transformer_model.config.hidden_size, num_labels, bias=True
         )
@@ -67,13 +68,26 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         
         #res = utilz.get_senses_vector(transformers_outputs,idx )
         transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
-        #transformers_pos_outputs_sum = torch.stack(transformers_pos_outputs.hidden_states[-4:], dim=0).sum(dim=0)
-        #transformers_outputs_total_sum = transformers_outputs_sum + transformers_pos_outputs_sum
-        #print("OUTPUT: " + str(transformers_outputs_sum.size()))
-        #time.sleep(5)
-        #transformers_outputs_total_sum = self.dropout(transformers_outputs_total_sum)
-        #transformers_outputs_total_sum = utilz.get_senses_vector(transformers_outputs_total_sum,idx,word_ids )
+        #print(transformers_outputs_sum.size())
+
         transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
+        #print(transformers_outputs_sum.size())
+        #time.sleep(5)
+
+        #transformers_pos_outputs_sum = torch.stack(transformers_pos_outputs.hidden_states[-4:], dim=0).sum(dim=0)
+        #transformers_pos_outputs_sum = utilz.get_senses_vector(transformers_pos_outputs_sum,idx,word_ids )
+
+        #print(transformers_outputs_sum.size())
+        #print(transformers_pos_outputs_sum.size())
+        #time.sleep(10)
+        #transformers_outputs_total_sum = transformers_outputs_sum + transformers_pos_outputs_sum
+        #transformers_outputs_total_sum = torch.cat((transformers_outputs_sum,transformers_pos_outputs_sum), dim = 1)
+        
+        #print("OUTPUT: " + str(transformers_outputs_total_sum.size()))
+        #time.sleep(5)
+
+        #transformers_outputs_total_sum = self.dropout(transformers_outputs_total_sum)
+        #transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
 
         transformers_outputs_sum = self.dropout(transformers_outputs_sum)
         #res = self.dropout(res)
@@ -99,15 +113,16 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
                 "params": self.transformer_model.parameters(),
                 "lr": utilz.transformer_learning_rate,
                 "weight_decay": utilz.transformer_weight_decay,
-            }
-            #""",
-             #{
-              #  "params": self.transformer_pos_model.parameters(),
-               # "lr": utilz.transformer_learning_rate,
-                #"weight_decay": utilz.transformer_weight_decay,
-            #} """
+            },
+            # {
+            #    "params": self.transformer_pos_model.parameters(),
+            #    "lr": utilz.transformer_learning_rate,
+            #    "weight_decay": utilz.transformer_weight_decay,
+            #} 
         ]           
-        optimizer = torch.optim.Adam(groups)
+        #optimizer =optimization.Adafactor(groups)
+        optimizer =optimization.AdamW(groups)
+
         return optimizer
     
     def training_step(self,train_batch,batch_idx):
@@ -133,26 +148,21 @@ class WSD(pl.LightningModule): #//TODO vedere se far brillare label_list
         self.val_metric(y_pred,val_batch["labels"])
         self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
     
+        
     def test_step(self, test_batch,idx):
         
         outputs = self(**test_batch)
         y_pred = outputs.argmax(dim = 1)
         predicted_labels = utilz.idx_to_label(
-                    self.label_list, y_pred.tolist())
+                    self.idx_to_labels, y_pred.tolist())
         #print("RES: " + str(predicted_labels))
         #print(utilz.idx_to_label(
         #            self.label_list, test_batch["labels"].tolist()))
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),test_batch["labels"].view(-1),ignore_index=-100)
 
         self.test_metric(y_pred,test_batch["labels"])
-        self.log_dict({'test_loss':loss,'loss_f1': self.test_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        self.log_dict({'test_loss':loss,'test_f1': self.test_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
                       
 
     
-    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0):
-        outputs = self(**batch)
-        y_pred = outputs.argmax(dim = 1)
-        predicted_labels = utilz.idx_to_label(
-                    self.label_list, y_pred.tolist())
-        return predicted_labels
-  
+    

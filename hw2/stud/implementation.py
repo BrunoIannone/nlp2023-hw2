@@ -45,7 +45,7 @@ class StudentModel(Model):
         self.device = device
         #self.TOKENIZER = AutoTokenizer.from_pretrained(os.path.join(DIRECTORY_NAME, '../../model/GlossBERT'), use_fast=False,add_prefix_space = True, )
         print("Giacomo")
-        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/glossbert2_0.884.ckpt'),map_location=self.device)
+        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/this.ckpt'),map_location=self.device)
         #self.model.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/epoch=2-step=4629.ckpt'),map_location=self.device)
 
         self.model.eval()
@@ -85,7 +85,8 @@ class StudentModel(Model):
         #samples = []
         res = []
         for json_line in sentences:
-            print(json_line)
+            #print(json_line)
+            #time.sleep(5)
             #samples = []
             predicted_labels = self.predict_(json_line)
             res.append(predicted_labels)
@@ -93,16 +94,32 @@ class StudentModel(Model):
     
     def predict_(self,json_line):
         unknown_candidates = []
+        modificato = False
+        #print(json_line["candidates"])
         for candidate in json_line["candidates"]:
-            if json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()):
+            if len(json_line["candidates"][candidate]) == 1 and json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()):
+                unknown_candidates.append(0)
+            elif len(json_line["candidates"][candidate]) == 1 and json_line["candidates"][candidate][0] not in list(self.vocab["labels_to_idx"].keys()):
                 #print(json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()))
 
-                unknown_candidates.append(0)
-
-            else:
                 unknown_candidates.append(json_line["candidates"][candidate][0])
+            else: 
+                for candidate_value in json_line["candidates"][candidate]:
+                #print("SENSE" +str(sense))
+                    if candidate_value in list(self.vocab["labels_to_idx"].keys()):
+                    #print("SI>1")
+                    #print(labels_idx_dict[word_idx])
+                    #print(sense)
+                        unknown_candidates.append(0)
+                    #print(res)
+                    #time.sleep(10)
+                        modificato = True
+                        break
+                if not modificato:
+                    unknown_candidates.append(json_line["candidates"][candidate][0])
+            
         json_line["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], json_line["candidates"])
-        print("HERE" + str(unknown_candidates))
+        #print("HERE" + str(unknown_candidates))
         #samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
         #            "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
         json_line = {"sample": json_line}
@@ -113,7 +130,7 @@ class StudentModel(Model):
         y_pred = y_pred.argmax(dim = 1)
         predicted_labels = utilz.idx_to_label(
         list(self.vocab["labels_to_idx"].keys()), y_pred.tolist())
-        print(predicted_labels)
+        #print(predicted_labels)
         for i in range(len(unknown_candidates)):
             if unknown_candidates[i] == 0:
                 continue

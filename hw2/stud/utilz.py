@@ -5,12 +5,12 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 32
+BATCH_SIZE = 8
 NUM_WORKERS = 12
 LEARNING_RATE = 1e-3
-weight_decay = 0.0
+weight_decay = 0.1
 transformer_learning_rate = 1e-5
-transformer_weight_decay = 0.0
+transformer_weight_decay = 0.1
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -18,11 +18,13 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 #LANGUAGE_MODEL_NAME = "distilbert-base-uncased"
 #LANGUAGE_MODEL_NAME = "roberta-base"
 #LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
+#LANGUAGE_MODEL_NAME = "xlm-mlm-en-2048"
 LANGUAGE_MODEL_NAME = 'bert-base-uncased'
-LANGUAGE_MODEL_NAME_POS =  'QCRI/bert-base-multilingual-cased-pos-english'
+#LANGUAGE_MODEL_NAME = "prajjwal1/bert-mini"
+#LANGUAGE_MODEL_NAME_POS =  'QCRI/bert-base-multilingual-cased-pos-english'
 
 DIRECTORY_NAME = os.path.dirname(__file__)
-LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME, '../../model/GlossBERT')
+#LANGUAGE_MODEL_PATH = os.path.join(DIRECTORY_NAME, '../../model/GlossBERT')
 TOKENIZER = AutoTokenizer.from_pretrained(
     LANGUAGE_MODEL_NAME, use_fast=True, add_prefix_space=True)
 
@@ -217,7 +219,7 @@ def map_new_index(batch:List[dict], batch_out:dict):
     last_index = None
     res = []
     i = 0
-    for l in word_ids: #the code below saves in how meny subwords a word has been divided. As they will have the same index, we can recover when each word start after the tokenization
+    for l in word_ids: #the code below saves in how many subwords a word has been divided. As they will have the same index, we can recover when each word start after the tokenization
         i = 0
         temp = []
         last_index = None
@@ -227,9 +229,9 @@ def map_new_index(batch:List[dict], batch_out:dict):
 
                 continue
             else:
-                temp.append(i)
-                last_index = i
-                i += 1
+                temp.append(i) #[0,1,2]
+                last_index = i #2
+                i += 1 #3
         res.append(torch.tensor(temp))
 
     word_ids_ = torch.nn.utils.rnn.pad_sequence(
@@ -302,7 +304,7 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
     Args:
         model_output (Tensor): transformer output tensor
         tensor_idx (Tensor): Tensor where each row contains all sentence original target word indices
-        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after suubwords tokenizations)
+        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after subwords tokenizations)
     Returns:
         Tensor: The stacked tensor of all target words embedding
     """
@@ -326,21 +328,23 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
             ##SCOMMENTA DA QUI
             original_index = idx[i][elem]
             # print("orig:" + str(original_index))
-            
-            shifted_index = int(word_ids[i][original_index])
+            #print(model_output)
+            shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
             # print("Shift: " + str(shifted_index))
-            next_word = int(word_ids[i][original_index + 1])
+            next_word = int(word_ids[i][original_index + 2]) #+1 from [CLS] +1 for next word
             word_lenght = next_word - shifted_index
             # print(lenght)
             # time.sleep(5)
-            stack = torch.stack(
-                [model_output[i][shifted_index: shifted_index + word_lenght]], dim=1)
+            
+            #stack = torch.stack(
+            #    [model_output[i][shifted_index: shifted_index + word_lenght]], dim=1)
+            
             # print(stack.size())
             # time.sleep(2)
-            res.append(torch.sum(stack, dim=0).squeeze())
+            res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
             # print(res)
 
-    res = torch.stack(res, dim=-2)
+    res = torch.stack(res, dim=0)
     return res
 
 
@@ -385,3 +389,4 @@ def idx_to_label(idx_to_labels: dict, src_label: List[List[int]]) -> List[List[s
     # out_label.append(temp)
 
     return out_label
+

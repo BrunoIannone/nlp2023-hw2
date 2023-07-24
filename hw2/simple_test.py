@@ -10,7 +10,6 @@ def main(sentences: List[Dict]):
     predicted_sentences = model.predict(sentences)
 
     for sentence, predicted_labels_wsd in zip(sentences, predicted_sentences):
-        print("Sentence dict:")
         pp(sentence)
         print()
         print("Predicted senses:")

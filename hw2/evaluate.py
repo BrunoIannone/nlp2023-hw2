@@ -50,7 +50,6 @@ def read_dataset(path: str) -> Tuple[List[Dict], List[List[List[str]]]]:
         assert (all(gt_sense in candidates for gt_sense in gt)
                 for gt, candidates in zip(sentence_data["senses"].values(), sentence_data["candidates"].values()))
         assert len(sentence_data["words"]) == len(sentence_data["lemmas"]) == len(sentence_data["pos_tags"])
-        print("SENSI" + str(sentence_data['senses']))
         senses_s.append(list(sentence_data.pop("senses").values()))
         sentence_data["id"] = sentence_id
         sentences_s.append(sentence_data)

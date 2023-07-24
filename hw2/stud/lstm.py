@@ -38,12 +38,12 @@ class Lstm_WSD(pl.LightningModule):
         #    self.word_embeddings = nn.Embedding(
         #        vocab_size, embedding_dim, padding_idx=0)
 
-        #self.lstm = nn.LSTM(embedding_dim, hidden_dim, layers_num,
-         #                   bidirectional=utils.BIDIRECTIONAL, batch_first=True)
-        self.lstm = elmo_lstm.ElmoLstm(utils.EMBEDDING_DIM,utils.HIDDEN_DIM,2048,utils.LAYERS_NUM,requires_grad=True)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, layers_num,
+                           bidirectional=utils.BIDIRECTIONAL, batch_first=True)#,dropout = utils.DROPOUT_LSTM)
+        #self.lstm = elmo_lstm.ElmoLstm(utils.EMBEDDING_DIM,utils.HIDDEN_DIM,2048,utils.LAYERS_NUM,requires_grad=True)
 
         self.elmo = elmo.Elmo(os.path.join(utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_options.json"), os.path.join(
-            utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=True,keep_sentence_boundaries=True,do_layer_norm=True)
+            utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=False,keep_sentence_boundaries=True,do_layer_norm=True)
         if (utils.DROPOUT_LAYER > 0):
             self.dropout_layer = nn.Dropout(utils.DROPOUT_LAYER)
 
@@ -87,7 +87,7 @@ class Lstm_WSD(pl.LightningModule):
         #print(embeds)
         #time.sleep(5)
         #print(embeds['elmo_representations'][-1].size())
-        output_padded, _ = self.lstm(embeds['elmo_representations'][-1],embeds['mask'])
+        output_padded, _ = self.lstm(embeds['elmo_representations'][-1])#,embeds['mask'])
         
         output_padded = utils.get_senses_vector(output_padded, idx, None)
         #print(output_padded.size())

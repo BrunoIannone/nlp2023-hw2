@@ -25,7 +25,7 @@ class WsdDataModule(LightningDataModule):
             batch_size = utilz.BATCH_SIZE,
             num_workers = utilz.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=utilz.collate_fn
         ) 
     def val_dataloader(self):
         return DataLoader(
@@ -33,7 +33,7 @@ class WsdDataModule(LightningDataModule):
             batch_size = utilz.BATCH_SIZE,
             num_workers = utilz.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=utilz.collate_fn
         )
     def test_dataloader(self):
         return DataLoader(
@@ -41,5 +41,5 @@ class WsdDataModule(LightningDataModule):
             batch_size = utilz.BATCH_SIZE,
             num_workers = utilz.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=utilz.collate_fn
         )
