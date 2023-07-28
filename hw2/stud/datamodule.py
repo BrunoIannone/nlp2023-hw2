@@ -12,7 +12,7 @@ class WsdDataModule(LightningDataModule):
         self.valid_data = valid_data
         self.test_data = test_data
         self.labels_to_idx = labels_to_idx
-    
+
     def setup(self, stage: str):
         
         self.train_dataset = wsddataset.WsdDataset(self.training_data["samples"],self.labels_to_idx)
@@ -20,6 +20,7 @@ class WsdDataModule(LightningDataModule):
         self.test_dataset = wsddataset.WsdDataset(self.test_data["samples"],self.labels_to_idx)
 
     def train_dataloader(self):
+        
         return DataLoader(
             self.train_dataset,
             batch_size = utilz.BATCH_SIZE,

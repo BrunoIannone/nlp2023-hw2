@@ -11,26 +11,25 @@ import time
 import torchmetrics
 
 class WSD(pl.LightningModule): 
-    def __init__(self, language_model_name: str, num_labels: int, idx_to_labels:dict,fine_tune_lm: bool = True, *args, **kwargs) -> None:
+    def __init__(self, language_model_name: str, num_labels: int, idx_to_labels:dict,fine_tune_lm: bool = True,*args, **kwargs) -> None:
         super().__init__()
         self.num_labels = num_labels
         self.idx_to_labels = idx_to_labels
-        # layers
         
-        self.transformer_model = AutoModelForTokenClassification.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
+        
+        self.learning_rate = 1e-3
+        self.backbone = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
         #self.transformer_pos_model = AutoModel.from_pretrained(language_model_name_pos,output_hidden_states=True,num_labels = num_labels)
         #for param in self.transformer_pos_model.parameters():
         #        param.requires_grad = False
-        #print(self.transformer_model)
-        #time.sleep(10)
+        
         if not fine_tune_lm:
-            for param in self.transformer_model.parameters():
+            for param in self.backbone.parameters():
                 param.requires_grad = False
-        self.dropout = torch.nn.Dropout(0.6)
+        self.dropout = torch.nn.Dropout(0.8)
         self.classifier = torch.nn.Linear(
-            self.transformer_model.config.hidden_size, num_labels, bias=True
+            self.backbone.config.hidden_size, num_labels, bias=True
         )
-        #self.relu = torch.nn.ReLU()
         
         self.val_metric  = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
         self.test_metric = torchmetrics.F1Score(task="multiclass", num_classes=num_labels, average='micro')
@@ -44,10 +43,7 @@ class WSD(pl.LightningModule):
         input_ids: torch.Tensor = None,
         attention_mask: torch.Tensor = None,
         token_type_ids: torch.Tensor = None,
-        labels: torch.Tensor = None,
-        compute_predictions: bool = False,
-        compute_loss: bool = True,
-        *args,
+        
         **kwargs,
     ) -> torch.Tensor:
         # group model inputs and pass to the model
@@ -61,87 +57,51 @@ class WSD(pl.LightningModule):
           model_kwargs["token_type_ids"] = token_type_ids
         
         
-        transformers_outputs = self.transformer_model(**model_kwargs)
-        #transformers_pos_outputs = self.transformer_pos_model(**model_kwargs)
-
-        #transformers_outputs = transformers_outputs[0]
-        
-        #res = utilz.get_senses_vector(transformers_outputs,idx )
+        transformers_outputs = self.backbone(**model_kwargs)    
         transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
-        #print(transformers_outputs_sum.size())
-
         transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
-        #print(transformers_outputs_sum.size())
-        #time.sleep(5)
-
-        #transformers_pos_outputs_sum = torch.stack(transformers_pos_outputs.hidden_states[-4:], dim=0).sum(dim=0)
-        #transformers_pos_outputs_sum = utilz.get_senses_vector(transformers_pos_outputs_sum,idx,word_ids )
-
-        #print(transformers_outputs_sum.size())
-        #print(transformers_pos_outputs_sum.size())
-        #time.sleep(10)
-        #transformers_outputs_total_sum = transformers_outputs_sum + transformers_pos_outputs_sum
-        #transformers_outputs_total_sum = torch.cat((transformers_outputs_sum,transformers_pos_outputs_sum), dim = 1)
-        
-        #print("OUTPUT: " + str(transformers_outputs_total_sum.size()))
-        #time.sleep(5)
-
-        #transformers_outputs_total_sum = self.dropout(transformers_outputs_total_sum)
-        #transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
-
         transformers_outputs_sum = self.dropout(transformers_outputs_sum)
-        #res = self.dropout(res)
-        #logits = self.relu(res)
-        
-        #logits = self.classifier(transformers_outputs_total_sum)  
-        logits = self.classifier(transformers_outputs_sum)      
-        #logits = F.log_softmax(self.classifier(res),dim = 1)
-        #logits = F.log_softmax(res,dim = 1)
-
-                
+        logits = self.classifier(transformers_outputs_sum)   
         return logits
 
     
     def configure_optimizers(self):
+        
         groups = [
-            {
-                "params": self.classifier.parameters(),
-                "lr": utilz.LEARNING_RATE,
-                "weight_decay": utilz.weight_decay,
+          {
+               "params": self.classifier.parameters(),
+               "lr": self.learning_rate,
+               "weight_decay": utilz.weight_decay,
             },
-            {
-                "params": self.transformer_model.parameters(),
-                "lr": utilz.transformer_learning_rate,
-                "weight_decay": utilz.transformer_weight_decay,
-            },
-            # {
-            #    "params": self.transformer_pos_model.parameters(),
-            #    "lr": utilz.transformer_learning_rate,
-            #    "weight_decay": utilz.transformer_weight_decay,
-            #} 
+        #    {
+        #        "params": self.backbone.parameters(),
+        #        "lr": utilz.transformer_learning_rate,
+        #        "weight_decay": utilz.transformer_weight_decay,
+        #    }
+            
+             
         ]           
         #optimizer =optimization.Adafactor(groups)
-        optimizer =optimization.AdamW(groups)
+        optimizer =torch.optim.AdamW(groups)
 
-        return optimizer
+        
+        
+        
+        return [optimizer]
     
     def training_step(self,train_batch,batch_idx):
 
         outputs = self(**train_batch)
-        #print(outputs)
-        #time.sleep(10)
-        loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
-        #loss = F.cross_entropy(outputs.view(-1),train_batch["labels"].view(-1),ignore_index=-100)
         
-        self.log_dict({'train_loss':loss},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
+        
+        self.log_dict({'train_loss':loss},on_epoch=True, batch_size=utilz.BATCH_SIZE,on_step=False,prog_bar=True)
         return loss
         
 
     def validation_step(self, val_batch,idx):
         outputs = self(**val_batch)
-        #print(outputs.size())
         y_pred = outputs.argmax(dim = 1)
-        #print(val_batch["labels"].size())
        
        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
@@ -153,11 +113,7 @@ class WSD(pl.LightningModule):
         
         outputs = self(**test_batch)
         y_pred = outputs.argmax(dim = 1)
-        predicted_labels = utilz.idx_to_label(
-                    self.idx_to_labels, y_pred.tolist())
-        #print("RES: " + str(predicted_labels))
-        #print(utilz.idx_to_label(
-        #            self.label_list, test_batch["labels"].tolist()))
+        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),test_batch["labels"].view(-1),ignore_index=-100)
 
         self.test_metric(y_pred,test_batch["labels"])

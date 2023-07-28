@@ -5,14 +5,12 @@ import time
 import wsd_model as mod
 import pytorch_lightning as pl
 import utilz
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, BackboneFinetuning, BatchSizeFinder, LearningRateFinder
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.profilers import PyTorchProfiler
 import datamodule
 import torch
 import lstm
 import lstm_utils as utils
-
 
 #JSON DATA PROCESSING
 training_data = utilz.build_data_from_json(
@@ -39,17 +37,19 @@ vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
 #MODEL RELATED INITIALIZATIONS
 
 dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
+
+
 #model = lstm.Lstm_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,
 #                          50265, len(vocab.labels_to_idx), utils.LAYERS_NUM, None,vocab.idx_to_labels)
-#model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx.keys()),vocab.idx_to_labels, fine_tune_lm=True)
-model = mod.WSD.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/this.ckpt'),map_location='cpu')
-logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/bert_onlyCLS"))
-#profiler = PyTorchProfiler(on_trace_ready = torch.profiler.tensorboard_trace_handler(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/profiler0")),trace_memory = True, schedule = torch.profiler.schedule(skip_first=10,wait=1,warmup=1,active=20))
-trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/bert_onlyCLS.ckpt'))],logger=logger,accelerator='gpu')
-#trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,logger=logger, profiler=profiler)
+model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx.keys()),vocab.idx_to_labels,fine_tune_lm=False)
+#model.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/test/only_classifier.ckpt'),map_location='cpu')
+logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/test"))
+
+trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[BackboneFinetuning(unfreeze_backbone_at_epoch=7,lambda_func=lambda epoch: 1,backbone_initial_lr=1e-5,initial_denom_lr=1,should_align=False,train_bn=True,verbose=True),EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/test'))],logger=logger,accelerator='gpu')#,auto_lr_find=True, auto_scale_batch_size=False)
 
 #START TRAINING ROUTINE
-#trainer.fit(model,datamodule = dm)
+#trainer.tune(model,datamodule=dm)
+trainer.fit(model,datamodule = dm)
 #trainer.validate(model,datamodule=dm)
 trainer.test(model,datamodule = dm)
-#model = mod.WSD.load_from_checkpoint
+

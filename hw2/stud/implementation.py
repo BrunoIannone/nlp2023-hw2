@@ -40,25 +40,24 @@ class StudentModel(Model):
     def __init__(self,device):
         # Load your models/tokenizer/etc. that only needs to be loaded once when doing inference
         self.vocab = self.load_vocabularies(DIRECTORY_NAME)
-        #print(self.vocab.keys())
         self.LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
         self.device = device
-        #self.TOKENIZER = AutoTokenizer.from_pretrained(os.path.join(DIRECTORY_NAME, '../../model/GlossBERT'), use_fast=False,add_prefix_space = True, )
-        print("Giacomo")
-        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/this.ckpt'),map_location=self.device)
-        #self.model.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/epoch=2-step=4629.ckpt'),map_location=self.device)
-
+        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/0.8.ckpt'),map_location=self.device)
         self.model.eval()
-        print("Giacomino")
 
     def load_vocabularies(self, path: str,tokens_vocab = False):
-        """_summary_
+        """Load vocabularies
 
         Args:
             path (str): path to vocabularies word_to_idx and viceversa, labels_to_idx and viceversa
-
+            tokens_vocab(bool): If True, loads word_to_idx and idx_to_word vocabularies
         Returns:
-            dict: a dictionary containing the four others dictionaries: {"word_to_idx":word_to_idx,"idx_to_word":idx_to_word,"labels_to_idx":labels_to_idx,"idx_to_labels":idx_to_labels}
+            if(tokens_vocab == True)
+                dict: a dictionary containing the four others dictionaries: {"word_to_idx":word_to_idx,"idx_to_word":idx_to_word,"labels_to_idx":labels_to_idx,"idx_to_labels":idx_to_labels}
+            else:
+                {"labels_to_idx":labels_to_idx,"idx_to_labels":idx_to_labels}
+            
+                
         """
         vocab = {}
         if(tokens_vocab):
@@ -80,78 +79,62 @@ class StudentModel(Model):
             fp.close()
         return vocab
     
-    def predict(self, sentences: List[Dict]) -> List[List[str]]:
+    def predict(self, samples: List[Dict]) -> List[List[str]]:
         self.model.eval()
-        #samples = []
+        
         res = []
-        for json_line in sentences:
-            #print(json_line)
-            #time.sleep(5)
-            #samples = []
-            predicted_labels = self.predict_(json_line)
+        for sample in samples:
+            
+            predicted_labels = self.predict_(sample)
             res.append(predicted_labels)
+
         return res
     
-    def predict_(self,json_line):
+    def predict_(self,sample): #TODO: documentation missing
+        
         unknown_candidates = []
-        modificato = False
-        #print(json_line["candidates"])
-        for candidate in json_line["candidates"]:
-            if len(json_line["candidates"][candidate]) == 1 and json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()):
-                unknown_candidates.append(0)
-            elif len(json_line["candidates"][candidate]) == 1 and json_line["candidates"][candidate][0] not in list(self.vocab["labels_to_idx"].keys()):
-                #print(json_line["candidates"][candidate][0] in list(self.vocab["labels_to_idx"].keys()))
+        modified = False
 
-                unknown_candidates.append(json_line["candidates"][candidate][0])
+        for candidate in sample["candidates"]:
+            if len(sample["candidates"][candidate]) == 1 and sample["candidates"][candidate][0] in self.vocab["labels_to_idx"].keys():
+            
+                unknown_candidates.append(0)
+            
+            elif len(sample["candidates"][candidate]) == 1 and sample["candidates"][candidate][0] not in self.vocab["labels_to_idx"].keys():
+
+                unknown_candidates.append(sample["candidates"][candidate][0])
+            
             else: 
-                for candidate_value in json_line["candidates"][candidate]:
-                #print("SENSE" +str(sense))
-                    if candidate_value in list(self.vocab["labels_to_idx"].keys()):
-                    #print("SI>1")
-                    #print(labels_idx_dict[word_idx])
-                    #print(sense)
+                
+                for candidate_value in sample["candidates"][candidate]:
+                    
+                    if candidate_value in self.vocab["labels_to_idx"].keys():
+                    
                         unknown_candidates.append(0)
-                    #print(res)
-                    #time.sleep(10)
-                        modificato = True
+                    
+                        modified = True
                         break
-                if not modificato:
-                    unknown_candidates.append(json_line["candidates"][candidate][0])
+                
+                if not modified:
+                    unknown_candidates.append(sample["candidates"][candidate][0])
             
-        json_line["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], json_line["candidates"])
-        #print("HERE" + str(unknown_candidates))
-        #samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
-        #            "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
-        json_line = {"sample": json_line}
+        sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], sample["candidates"])
+        sample = {"sample": sample}
             
-        batch = utilz.collate_fn([json_line]).to(self.device)
+        batch = utilz.collate_fn([sample]).to(self.device)
            
         y_pred = self.model(**batch)
         y_pred = y_pred.argmax(dim = 1)
+
         predicted_labels = utilz.idx_to_label(
         list(self.vocab["labels_to_idx"].keys()), y_pred.tolist())
-        #print(predicted_labels)
+        
         for i in range(len(unknown_candidates)):
             if unknown_candidates[i] == 0:
                 continue
             else:
                 predicted_labels[i] = unknown_candidates[i]
-        print(predicted_labels)
-        print("----------")
+        
+        
         return predicted_labels
     
-    def dict_to_dataset(self, batch):
-
-        samples = []
-        
-        for json_line in batch:
-            
-            samples.append({"instance_ids": json_line["instance_ids"], "lemmas": json_line["lemmas"], "words": json_line["words"],
-                        "pos_tags": json_line["pos_tags"], "senses": json_line["candidates"], "candidates": json_line["candidates"]})
-        
-
-        return {
-            "samples": samples
-        }
-        
-   

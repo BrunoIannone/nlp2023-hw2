@@ -7,12 +7,13 @@ class Vocabulary():
     """
 
     def __init__(self,labels: List[List[str]], sentences: List[List[str]] = None, save_vocab: bool = False, build_tokens_vocabulary: bool = False):
-        """Init function for the vocabulary class
+        """Init function for the vocabulary class.
+        If build_tokens_vocabulary = True, <pad> index is -100 and <unk> index is 0
 
         Args:
             sentences (List[List[str]]): List of list of sentence tokens
             labels (List[List[str]]): List of list of sentences token labels
-            save_vocab (bool, optional): True if the vocabulary needs to be saved (as .txt). Defaults to False.
+            save_vocab (bool, optional): True if the vocabulary needs to be saved (as .txt). Default to False.
             build_tokens_vocabulary (bool, optional): True if word_to_idx and idx_to_word vocabularies are needed. Default to False
 
 
@@ -52,7 +53,7 @@ class Vocabulary():
     
     def build_tokens_vocabulary(self, sentences: List[List[str]]):
         """Create two different vocabularies from sentence tokens for word to vocabulary index and viceversa
-        N.B. Padding will have index 0 while unknown words index 1.
+        N.B. Padding will have index -100 while unknown words index 0.
         Args:
             sentences (List[List[str]]): List of list of sentence tokens
 
@@ -66,7 +67,6 @@ class Vocabulary():
 
         word_to_idx["<pad>"] = -100
         idx_to_word[-100] = "<pad>"
-        #idx += 1
 
         word_to_idx["<unk>"] = idx
         idx_to_word[idx] = "<unk>"
