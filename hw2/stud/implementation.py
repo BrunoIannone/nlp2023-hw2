@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader
 import torch
 import os
 import time
+import torch.nn.functional as F
+
 def build_model(device: str) -> Model:
     # STUDENT: return StudentModel()
     # STUDENT: your model MUST be loaded on the device "device" indicates
@@ -42,7 +44,7 @@ class StudentModel(Model):
         self.vocab = self.load_vocabularies(DIRECTORY_NAME)
         self.LANGUAGE_MODEL_NAME = 'kanishka/GlossBERT'
         self.device = device
-        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/0.8.ckpt'),map_location=self.device)
+        self.model = wsd_model.WSD.load_from_checkpoint(os.path.join(DIRECTORY_NAME,'../../model/0.001, 0.002, 0.01.ckpt'),map_location=self.device)
         self.model.eval()
 
     def load_vocabularies(self, path: str,tokens_vocab = False):
@@ -138,3 +140,76 @@ class StudentModel(Model):
         
         return predicted_labels
     
+    
+    
+    def max_result(self,y_pred,known_candidate):
+        max = -1
+        res = None
+        print(known_candidate)
+        #time.sleep(5)
+        for candidate in known_candidate:
+            if y_pred[0][candidate] > max and y_pred[0][candidate] > 0.51 :
+                res = candidate
+                max = y_pred[0][candidate]
+        return res
+
+
+    
+    def predict__(self,sample):
+        res = []
+        for target in sample["candidates"]:
+            #print(sample["candidates"][target])
+            if len(sample["candidates"][target]) == 1:
+                res.append(sample["candidates"][target][0])
+            elif all(candidate in self.vocab["labels_to_idx"].keys() for candidate in sample["candidates"][target]):
+                
+                
+                sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"],  {target : sample["candidates"][target]})
+                sample_ = {"sample": sample}
+            
+                batch = utilz.collate_fn([sample_]).to(self.device)
+           
+                y_pred = self.model(**batch)
+                print(sample["senses"])
+                time.sleep(5)
+                y_pred_temp = self.max_result(y_pred,[sample["senses"][target]])
+                if y_pred_temp == None:
+                    y_pred = y_pred.argmax(dim = 1)
+                    predicted_labels = utilz.idx_to_label(
+                    list(self.vocab["labels_to_idx"].keys()), [y_pred])
+                    res.append(predicted_labels)
+                else:
+                    predicted_labels = utilz.idx_to_label(
+                    list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
+                    res.append(predicted_labels)
+            else:
+                known_candidate = []
+                unknown_candidate = []
+                for candidate in sample["candidates"][target]:
+                    #print(candidate)
+                    if candidate in self.vocab["labels_to_idx"].keys():
+                        known_candidate.append(self.vocab["labels_to_idx"][candidate])
+                    else:
+                        #print(target,candidate)
+
+                        unknown_candidate.append(candidate)
+                if(known_candidate == []):
+                    res.append(unknown_candidate[0])
+                    continue
+                #print(sample["candidates"][target])
+                sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], {target : sample["candidates"][target]})
+                sample_ = {"sample": sample}
+            
+                batch = utilz.collate_fn([sample_]).to(self.device)
+           
+                y_pred = F.softmax(self.model(**batch),dim = 1)
+                #print(y_pred,y_pred.size())
+                y_pred_temp = self.max_result(y_pred,known_candidate)
+                if y_pred_temp == None:
+                    res.append(unknown_candidate[0])
+                else:
+                    predicted_labels = utilz.idx_to_label(
+                    list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
+                    res.append(predicted_labels)
+
+        return res

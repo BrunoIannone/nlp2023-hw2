@@ -27,4 +27,14 @@ if __name__ == "__main__":
                 "words": ["Choose", "203", "business", "executives", "."],
                 'candidates': {"0": ["select.v.h.01", "preferred.v.h.01", "chosen.v.h.01"],
                                "3": ["executive.n.h.01"]}},
-        ])
+            {
+                "id": "d000.s032",
+                "instance_ids": {"0": "d000.s032.t000", "3": "d000.s032.t001"},
+                "lemmas": ["choose", "203", "business", "executive", "."],
+                "pos_tags": ["VERB", "NUM", "NOUN", "NOUN", "."],
+                "words": ["Choose", "203", "business", "executives", "."],
+                'candidates': {"0": ["select.v.h.01", "preferred.v.h.01", "chosen.v.h.01"],
+                               "3": ["cm.n.h.04","cm.n.h.01"]}
+            }
+            
+    ])

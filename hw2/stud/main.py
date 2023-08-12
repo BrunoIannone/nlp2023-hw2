@@ -8,48 +8,66 @@ import utilz
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, BackboneFinetuning, BatchSizeFinder, LearningRateFinder
 from pytorch_lightning.loggers import TensorBoardLogger
 import datamodule
+import lstm_datamodule
 import torch
 import lstm
 import lstm_utils as utils
+tot = 36
+i = 0
+for elmo_lr in utils.ELMO_LR:
+    for lin_lr in utils.LEARNING_RATE:
+        for dropout in utils.DROPOUT_LAYER: 
+            for lin_wd in utils.LIN_WD:
+                for elmo_wd in utils.ELMO_WD:
 
-#JSON DATA PROCESSING
-training_data = utilz.build_data_from_json(
-    os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/train_coarse_grained.json'),save_words=True)
-valid_data = utilz.build_data_from_json(
-    os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/val_coarse_grained.json'))
-test_data = utilz.build_data_from_json(
-    os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/test_coarse_grained.json'))
+                    print(lin_lr,elmo_lr,dropout,lin_wd,elmo_wd)
+                #JSON DATA PROCESSING
+                    training_data = utilz.build_data_from_json(
+                        os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/train_coarse_grained.json'))
+                    valid_data = utilz.build_data_from_json(
+                        os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/val_coarse_grained.json'))
+                    test_data = utilz.build_data_from_json(
+                        os.path.join(utilz.DIRECTORY_NAME, '../../data/coarse-grained/test_coarse_grained.json'))
 
-#BUILD LABEL VOCANULARY
-senses = utilz.build_all_senses(os.path.join(utilz.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
-vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
+                    #BUILD LABEL VOCANULARY
+                    senses = utilz.build_all_senses(os.path.join(utilz.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"))
+                    vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
 
-#senses = []
-#for sample in training_data['samples']:
-#    for sense in sample['senses']:
-#        senses.append(sample['senses'][sense]) 
-#print((senses))
-#time.sleep(10)
+                    #senses = []
+                    #for sample in training_data['samples']:
+                    #    for sense in sample['senses']:
+                    #        senses.append(sample['senses'][sense]) 
+                    #print((senses))
+                    #time.sleep(10)
 
-#vocab = vocabulary.Vocabulary(senses,save_vocab=False)
-#print(len(vocab.labels_to_idx))
+                    #vocab = vocabulary.Vocabulary(senses,save_vocab=False)
+                    #print(len(vocab.labels_to_idx))
 
-#MODEL RELATED INITIALIZATIONS
+                    #MODEL RELATED INITIALIZATIONS
 
-dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
+                    #dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
+
+                    dm = lstm_datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
 
 
-#model = lstm.Lstm_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,
-#                          50265, len(vocab.labels_to_idx), utils.LAYERS_NUM, None,vocab.idx_to_labels)
-model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx.keys()),vocab.idx_to_labels,fine_tune_lm=False)
-#model.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/test/only_classifier.ckpt'),map_location='cpu')
-logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/test"))
+                    model = lstm.Lstm_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,
+                                            50265, len(vocab.labels_to_idx), utils.LAYERS_NUM, None,vocab.idx_to_labels,lin_lr,elmo_lr,dropout, lin_wd,elmo_wd)
+                    #model = mod.WSD(utilz.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx.keys()),vocab.idx_to_labels,fine_tune_lm=True)
+                    #model = model.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/0.001, 0.002, 0.01.ckpt'),map_location='cpu')
+                    #logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/lstm_elmo") + str(utilz.LEARNING_RATE) + ", " + str(utilz.weight_decay) + ", " + str(utilz.transformer_weight_decay)))
+                    logger = TensorBoardLogger(os.path.join(utilz.DIRECTORY_NAME,"tb_logs/lstm_elmo") + str(lin_lr) + ", " + str(elmo_lr) + ", " + str(dropout)+ ", " + str(lin_wd) + ", " + str(elmo_wd))
 
-trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[BackboneFinetuning(unfreeze_backbone_at_epoch=7,lambda_func=lambda epoch: 1,backbone_initial_lr=1e-5,initial_denom_lr=1,should_align=False,train_bn=True,verbose=True),EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/test'))],logger=logger,accelerator='gpu')#,auto_lr_find=True, auto_scale_batch_size=False)
+                    #trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[BackboneFinetuning(unfreeze_backbone_at_epoch=5,lambda_func=lambda epoch: 1,backbone_initial_lr=1e-5,initial_denom_lr=1,should_align=False,train_bn=True,verbose=True),EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(filename= str(utilz.LEARNING_RATE) + ", " + str(utilz.weight_decay),monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/finetune/glossbert/nowarmup_weightdecay'))],logger=logger,accelerator='gpu')#,auto_lr_find=True, auto_scale_batch_size=False)
+                    #trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(filename= str(utilz.LEARNING_RATE) + ", " + str(utilz.weight_decay)+ ", " + str(utilz.transformer_weight_decay),monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/glossbert)'))],logger=logger,accelerator='gpu')#,auto_lr_find=True, auto_scale_batch_size=False)
+                    trainer = pl.Trainer(max_epochs = utilz.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(filename= str(lin_lr) + ", " + str(elmo_lr) + ", " + str(dropout)+ ", " + str(lin_wd) + ", " + str(elmo_wd),monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(utilz.DIRECTORY_NAME,'../../model/lstm_elmo)'))],logger=logger,accelerator='gpu')#,auto_lr_find=True, auto_scale_batch_size=False)
 
-#START TRAINING ROUTINE
-#trainer.tune(model,datamodule=dm)
-trainer.fit(model,datamodule = dm)
-#trainer.validate(model,datamodule=dm)
-trainer.test(model,datamodule = dm)
-
+                    #START TRAINING ROUTINE
+                    #trainer.tune(model,datamodule=dm)
+                    trainer.fit(model,datamodule = dm)
+                    #model.eval()
+                    #trainer.validate(model,datamodule=dm)
+                    model.eval()
+                    trainer.test(model,datamodule = dm,ckpt_path="best")
+    print("_________________")
+    print("TOTALE: " + str(i/tot) + "%")
+    i+=1    

@@ -7,16 +7,21 @@ from typing import List
 import time
 
 ###HYPERPARAMETERS###
+
+NUM_WORKERS = 12
 EMBEDDING_DIM = 1024
 LAYERS_NUM = 2
-HIDDEN_DIM = 150
+HIDDEN_DIM = 512
 EPOCHS_NUM = 500
-LEARNING_RATE = 0.01
+LEARNING_RATE = [1e-3] #i
+ELMO_LR = [1e-5,1e-6] #j
 CHANCES = 5
-DROPOUT_LAYER = 0.2
-DROPOUT_EMBED = 0.5
+DROPOUT_LAYER = [0.5,0.8] #k
+DROPOUT_EMBED = 0
 DROPOUT_LSTM = 0.2
-BATCH_SIZE = 4096 #2^12
+BATCH_SIZE = 64#32 
+LIN_WD = [0,0.001, 0.01]
+ELMO_WD = [0,0.001, 0.01]
 #####################
 EARLY_STOP = True
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -70,6 +75,8 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
     Returns:
         list: list of integers that represent labels indexes
     """
+    print(labels)
+    time.sleep(5)
     res = []
     for label in labels:
         res.append(labels_to_idx[label])
@@ -153,7 +160,6 @@ def collate_fn(sentence):
         list(int): lenghts of  non padded labels
         
     """
-
     (sentences, labels) = zip(*sentence)
 
     tensor_sentences = [torch.tensor(sentence_) for sentence_ in sentences ]     
@@ -185,8 +191,14 @@ def str_to_int(str_dict_key:dict):
 from allennlp.modules.elmo import batch_to_ids
 import utilz
 def collate_fn_elmo(batch):
+    #print(batch[0]["sample"]["words"])
+    #print("Lunghezza originale: " + str( len(batch[0]["sample"]["words"])))
+    #time.sleep(5)
     batch_out = {}
     batch_out["input_ids"] = batch_to_ids([sentence["sample"]["words"] for sentence in batch])
+    #print(batch_out["input_ids"])
+    #print("Input ids: " + str(batch_out["input_ids"].size()))
+    #time.sleep(5)
     #print(batch_out["input_ids"].size())
     #time.sleep(10)
     labels, idx = utilz.extract_labels_and_sense_indices(batch)
@@ -269,5 +281,5 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
             res.append(model_output[i][original_index])
             # print(res)
 
-    res = torch.stack(res, dim=-2)
+    res = torch.stack(res, dim=0)
     return res

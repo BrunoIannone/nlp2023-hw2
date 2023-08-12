@@ -7,8 +7,8 @@ import time
 
 BATCH_SIZE = 8
 NUM_WORKERS = 12
-LEARNING_RATE = 1e-4
-weight_decay = 1
+LEARNING_RATE = 1e-3
+weight_decay = 0.002
 transformer_learning_rate = 1e-5
 transformer_weight_decay = 0
 NUM_EPOCHS = 100
@@ -98,7 +98,7 @@ def word_to_idx(word_to_idx: dict, sentence: List[str]):
     return res
 
 
-def label_to_idx(labels_to_idx: dict, target_word_idx:List[str]):
+def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
     """Converts labels string in integer indexes.
     If there is only one possible sense and it's in labels_to_idx, then its index is taken. If there are more possible senses, the first known sense found in labels_to_idx is taken.
     If there is only one sense and it's unknown or there are multiple senses but they are not known, the label corresponding to 'O' is taken.

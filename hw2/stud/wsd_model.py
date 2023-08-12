@@ -3,7 +3,7 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, STEP_OUTPUT, TRA
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel, BertForTokenClassification,AutoModelForTokenClassification,optimization
-
+from sklearn.svm import LinearSVC
 #import stud.utilz as utilz
 import utilz
 import pytorch_lightning as pl
@@ -16,8 +16,6 @@ class WSD(pl.LightningModule):
         self.num_labels = num_labels
         self.idx_to_labels = idx_to_labels
         
-        
-        self.learning_rate = 1e-3
         self.backbone = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
         #self.transformer_pos_model = AutoModel.from_pretrained(language_model_name_pos,output_hidden_states=True,num_labels = num_labels)
         #for param in self.transformer_pos_model.parameters():
@@ -70,20 +68,21 @@ class WSD(pl.LightningModule):
         groups = [
           {
                "params": self.classifier.parameters(),
-               "lr": self.learning_rate,
+               "lr": utilz.LEARNING_RATE,
                "weight_decay": utilz.weight_decay,
             },
-        #    {
-        #        "params": self.backbone.parameters(),
-        #        "lr": utilz.transformer_learning_rate,
-        #        "weight_decay": utilz.transformer_weight_decay,
-        #    }
+           {
+               "params": self.backbone.parameters(),
+               "lr": utilz.transformer_learning_rate,
+               "weight_decay": utilz.transformer_weight_decay,
+           }
             
              
         ]           
-        #optimizer =optimization.Adafactor(groups)
-        optimizer =torch.optim.AdamW(groups)
-
+        #optimizer = optimization.Adafactor(groups)
+        #optimizer =torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=utilz.LEARNING_RATE, weight_decay=utilz.weight_decay)
+        #optimizer = torch.optim.Adam(groups)
+        optimizer = torch.optim.AdamW(groups)
         
         
         
