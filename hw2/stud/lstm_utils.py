@@ -1,30 +1,32 @@
 import os
 import json
-#import matplotlib.pyplot as plt
 import torch
-from torch.nn.utils.rnn import pad_sequence
 from typing import List
-import time
+
+from allennlp.modules.elmo import batch_to_ids
+
+
 
 ###HYPERPARAMETERS###
 
 NUM_WORKERS = 12
-EMBEDDING_DIM = 1024
+EMBEDDING_DIM = 300
 LAYERS_NUM = 2
-HIDDEN_DIM = 512
+HIDDEN_DIM = 150
 EPOCHS_NUM = 500
-LEARNING_RATE = [1e-3] #i
-ELMO_LR = [1e-5,1e-6] #j
+LEARNING_RATE = [1e-2] #i
+ELMO_LR = [1e-5] #j
+LSTM_LR = [1e-3]
 CHANCES = 5
 DROPOUT_LAYER = [0.5,0.8] #k
-DROPOUT_EMBED = 0
+DROPOUT_EMBED = [0.5]
 DROPOUT_LSTM = 0.2
-BATCH_SIZE = 64#32 
+BATCH_SIZE = 600
 LIN_WD = [0,0.001, 0.01]
 ELMO_WD = [0,0.001, 0.01]
+LSTM_WD = [0,0.001, 0.01]
 #####################
-EARLY_STOP = True
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 BIDIRECTIONAL = True
 DIRECTORY_NAME = os.path.dirname(__file__)
 
@@ -75,8 +77,7 @@ def label_to_idx(labels_to_idx:dict, labels: List[str]):
     Returns:
         list: list of integers that represent labels indexes
     """
-    print(labels)
-    time.sleep(5)
+
     res = []
     for label in labels:
         res.append(labels_to_idx[label])
@@ -132,46 +133,8 @@ def idx_to_label(idx_to_labels:dict, src_label:List[List[int]]):
     return out_label
 
 
-def plot_logs(logs, title): #notebook 3
 
-    plt.figure(figsize=(8,6))
 
-    plt.plot(list(range(len(logs['train_history']))), logs['train_history'], label='Train loss')
-    plt.plot(list(range(len(logs['valid_history']))), logs['valid_history'], label='Valid loss')
-    plt.plot(list(range(len(logs['f1_history']))), logs['f1_history'], label='F1',color = 'red')
-
-    plt.title(title)
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend(loc="upper right")
-
-    plt.show()
-
-def collate_fn(sentence):
-    """Collate function for the dataloader for batch padding
-
-    Args:
-        sentence (list(list(str),list(str))): List of list of couples [[sentence],[labels]]
-
-    Returns:
-        Tensor: padded sentence
-        Tensor: padded labels
-        list(int): lenghts of  non padded sentence
-        list(int): lenghts of  non padded labels
-        
-    """
-    (sentences, labels) = zip(*sentence)
-
-    tensor_sentences = [torch.tensor(sentence_) for sentence_ in sentences ]     
-    tensor_labels = [torch.tensor(label) for label in labels ]
-
-    sentences_lens = [len(sentence_) for sentence_ in tensor_sentences]
-    labels_lens = [len(label) for label in tensor_labels]
-
-    tensor_sentences_padded = pad_sequence(tensor_sentences, batch_first=True, padding_value=0)
-    tensor_labels_padded = pad_sequence(tensor_labels, batch_first=True, padding_value=0)
-    
-    return {'sentence': tensor_sentences_padded.to(DEVICE),'labels': tensor_labels_padded.to(DEVICE), 'sentence_len': sentences_lens, 'labels_len': labels_lens}
     
 
 def str_to_int(str_dict_key:dict):
@@ -188,22 +151,63 @@ def str_to_int(str_dict_key:dict):
         dict[int(key)] = str_dict_key[key]
     return dict
 
-from allennlp.modules.elmo import batch_to_ids
-import utilz
+
+def extract_labels_and_sense_indices(batch: List[dict]):
+    """Extract labels (senses) and target word indices for all the sentences
+
+    Args:
+        batch (List[dict]): sample dict
+
+    Returns:
+        tuple: (labels , indices) where both values are tensors
+    """
+    labels = []
+    idx = []
+    for sentence in batch:
+
+        label = sentence["sample"]["senses"]
+        temp = []
+
+        for index in label:
+
+            temp.append(int(index))
+            labels.append(label[index])
+
+        idx.append(torch.tensor(temp)) #one sentence may have more words to disambiguate
+
+    idx = torch.nn.utils.rnn.pad_sequence(
+        idx, batch_first=True, padding_value=-1)
+    
+    labels = torch.as_tensor(labels)
+
+    return labels, idx
+
+
+
+
+
 def collate_fn_elmo(batch):
-    #print(batch[0]["sample"]["words"])
-    #print("Lunghezza originale: " + str( len(batch[0]["sample"]["words"])))
-    #time.sleep(5)
+    
     batch_out = {}
     batch_out["input_ids"] = batch_to_ids([sentence["sample"]["words"] for sentence in batch])
-    #print(batch_out["input_ids"])
-    #print("Input ids: " + str(batch_out["input_ids"].size()))
-    #time.sleep(5)
-    #print(batch_out["input_ids"].size())
-    #time.sleep(10)
-    labels, idx = utilz.extract_labels_and_sense_indices(batch)
+    
+    labels, idx = extract_labels_and_sense_indices(batch)
+    
     batch_out["labels"] = labels
     batch_out["idx"] = idx
+    
+    return batch_out
+
+def collate_fn_glove(batch):
+    
+    batch_out = {}
+    batch_out["input_ids"] = [sentence["sample"]["words"] for sentence in batch]
+    
+    labels, idx = extract_labels_and_sense_indices(batch)
+    
+    batch_out["labels"] = labels
+    batch_out["idx"] = idx
+   
     return batch_out
 
 def get_idx_from_tensor(tensor_idx)-> List[tuple]:
@@ -218,15 +222,13 @@ def get_idx_from_tensor(tensor_idx)-> List[tuple]:
     """
     idx = []
     for row in tensor_idx:
-        # print(row)
         temp = []
         for elem in row:
             if elem == -1: # -1 is the chosen pad value
                 break
             temp.append(int(elem))
         idx.append(tuple(temp))
-        # print(idx)
-        # time.sleep(2)
+        
 
     return idx
 
@@ -240,46 +242,23 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
     Returns:
         Tensor: The stacked tensor of all target words embedding
     """
-    #print(model_output.size())
-    #time.sleep(10)
-    idx = get_idx_from_tensor(tensor_idx)
+    
     res = []
-    # print(model_output.size())
-
     for i in range(model_output.size(0)):
-        # print(idx[i])
-        #print(model_output[i].size())
-        #time.sleep(10)
-
-        for elem in range(len(idx[i])):
-            # y = torch.stack(
-            #    (model_output[i][0], model_output[i][idx[i][elem]]), dim=-2)
-            # sum = torch.sum(y, dim=-2)
-            # res.append(sum)
-            # print(model_output[i][idx[i][elem]])
-
-            # time.sleep(5)
-            #res.append(model_output[i][0])
-            
-            ##SCOMMENTA DA QUI
-            original_index = idx[i][elem]
-            # print("orig:" + str(original_index))
-            
-            #shifted_index = int(word_ids[i][original_index])
-            # print("Shift: " + str(shifted_index))
-            #next_word = int(word_ids[i][original_index + 1])
-            #word_lenght = next_word - shifted_index
-            # print(lenght)
-            # time.sleep(5)
-            #print(model_output[i][original_index].size())
-            #time.sleep(5)
-            #stack = torch.stack(
-            #    [model_output[i][original_index]], dim=1)
-            # print(stack.size())
-            # time.sleep(2)
-            #res.append(torch.sum(stack, dim=0).squeeze())
-            res.append(model_output[i][original_index])
-            # print(res)
+        for elem in tensor_idx[i]:
+            if elem ==-1:
+                break
+            res.append(model_output[i][elem])
+    
 
     res = torch.stack(res, dim=0)
+    
     return res
+
+def glove_embedding_tensorization(input_ids,embedding):
+    stack = []
+    for sentence in input_ids:
+        stack.append(embedding.get_vecs_by_tokens(sentence))
+    
+    stack =  torch.nn.utils.rnn.pad_sequence(stack,batch_first=True,padding_value=-100)
+    return stack.to("cuda")

@@ -57,8 +57,10 @@ def build_data_from_json(file_path: str, save_words: bool = False):
     samples = []
     data = json.load(f)
     for json_line in data:
-        samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
-                       "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        #samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
+         #               "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        samples.append({"words": data[json_line]["words"],"senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        
         if (save_words):
             words.append(data[json_line]["words"])
 

@@ -10,10 +10,11 @@ import lstm_utils as utils
 import torchmetrics
 import utilz
 from allennlp.modules import elmo,elmo_lstm
+from torchtext.vocab import GloVe
 
 
-class Lstm_WSD(pl.LightningModule):
-    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, num_labels: int, layers_num: int, embedding,label_list, lin_lr, elmo_lr, dropout,lin_wd,elmo_wd):
+class Glove_WSD(pl.LightningModule):
+    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, num_labels: int, layers_num: int, embedding,label_list, lin_lr, lstm_lr, embed_dropout,lin_dropout,lin_wd,lstm_wd):
 
         super().__init__()
 
@@ -32,29 +33,21 @@ class Lstm_WSD(pl.LightningModule):
         self.num_labels = num_labels
         self.label_list = label_list
         self.lin_lr = lin_lr
-        self.elmo_lr = elmo_lr
-        self.dropout = dropout
+        self.embedding_dim = embedding_dim
+        self.lstm_lr = lstm_lr
+        self.dropout = nn.Dropout(embed_dropout)
+        self.lin_dropoout = nn.Dropout(lin_dropout)
         self.lin_wd = lin_wd
-        self.elmo_wd = elmo_wd
+        self.lstm_wd = lstm_wd
         #if (embedding):  # note that the vocabulary must have an entry for padding and unk
         #    self.word_embeddings = nn.Embedding.from_pretrained(
         #        embedding, freeze=True)
         
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
-
+        self.word_embeddings = GloVe(name="840B", cache = os.path.join(utils.DIRECTORY_NAME,"glove.840B"),dim = 300)
+        #self.embedding = nn.Embedding.from_pretrained(os.path.join(utils.DIRECTORY_NAME,"glove.6B/glove.6B.50d.txt"))
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, layers_num,
                            bidirectional=utils.BIDIRECTIONAL, batch_first=True,dropout = utils.DROPOUT_LSTM)
-        #self.lstm = elmo_lstm.ElmoLstm(utils.EMBEDDING_DIM,utils.HIDDEN_DIM,2048,utils.LAYERS_NUM,requires_grad=True)
-
-        self.elmo = elmo.Elmo(os.path.join(utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_options.json"), os.path.join(
-            utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=True,keep_sentence_boundaries=False,do_layer_norm=True)
-        if (self.dropout > 0):
-            self.dropout_layer = nn.Dropout(self.dropout)
-
-        #if (utils.DROPOUT_EMBED > 0):
-        #    self.dropout_embed = nn.Dropout(utils.DROPOUT_EMBED)
-        #if (self.dropout > 0):
-        #    self.dropout_embed = nn.Dropout(utils.DROPOUT_EMBED)
+        
         
         if (utils.BIDIRECTIONAL):
 
@@ -89,29 +82,24 @@ class Lstm_WSD(pl.LightningModule):
         Returns:
             Tensor: Model predictions
         """
-        embeds = self.elmo(input_ids)
-        #print("Lunghezza embedding:  " + str(embeds['elmo_representations'][-1].size()))
-        #time.sleep(10)
-        #output_padded, _ = self.lstm(embeds['elmo_representations'][-1])#,embeds['mask'])
-        #if(utils.DROPOUT_EMBED > 0):
-           # embeds = self.dropout_embed(embeds)
-        output_padded = utils.get_senses_vector(embeds['elmo_representations'][-1], idx, None)
+        #print(input_ids.size())
         
-        # output_padded, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-        #    lstm_out, batch_first=True)
-        #embeds = self.word_embeddings(input_ids)
-        #if(utils.DROPOUT_EMBED > 0):
-         #   embeds = self.dropout_embed(embeds)
+        embeds = utils.glove_embedding_tensorization(input_ids,self.word_embeddings)
+        
+        embeds = self.dropout(embeds)
 
         #embeds = torch.nn.utils.rnn.pack_padded_sequence(
-           # embeds, sentence[1], batch_first=True, enforce_sorted=False)
+            #embeds, labels, batch_first=True, enforce_sorted=False)
 
-        #lstm_out, _ = self.lstm(embeds)
+        lstm_out, _ = self.lstm(embeds)
 
         #output_padded, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-           # lstm_out, batch_first=True)
-        if (self.dropout > 0):
-            output_padded = self.dropout_layer(output_padded)
+            #lstm_out, batch_first=True)
+        
+        output_padded = utils.get_senses_vector(lstm_out, idx, None)
+
+        
+        output_padded = self.lin_dropoout(output_padded)
 
         labels_space = self.hidden2labels(output_padded)
         return labels_space
@@ -123,15 +111,17 @@ class Lstm_WSD(pl.LightningModule):
                 "lr": self.lin_lr,
                  "weight_decay": self.lin_wd,
             },
-        
             {
-                "params": self.elmo.parameters(),
-                "lr": self.elmo_lr,
-                "weight_decay": self.elmo_wd,
+                "params": self.lstm.parameters(),
+                "lr": self.lstm_lr,
+                 "weight_decay": self.lstm_wd,
             }
+        
+            
         ]
         optimizer = torch.optim.AdamW(groups)
         return optimizer
+
 
     def training_step(self, train_batch, idx) -> STEP_OUTPUT:
         outputs = self(**train_batch)

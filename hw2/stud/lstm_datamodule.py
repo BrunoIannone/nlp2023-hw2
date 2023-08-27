@@ -1,6 +1,5 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-import utilz
 import lstm_utils
 import wsddataset
 
@@ -26,7 +25,7 @@ class WsdDataModule(LightningDataModule):
             batch_size = lstm_utils.BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=lstm_utils.collate_fn_glove
         ) 
     def val_dataloader(self):
         return DataLoader(
@@ -34,7 +33,7 @@ class WsdDataModule(LightningDataModule):
             batch_size = lstm_utils.BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=lstm_utils.collate_fn_glove
         )
     def test_dataloader(self):
         return DataLoader(
@@ -42,5 +41,5 @@ class WsdDataModule(LightningDataModule):
             batch_size = lstm_utils.BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=lstm_utils.collate_fn_glove
         )
