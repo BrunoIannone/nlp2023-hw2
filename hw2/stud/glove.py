@@ -88,17 +88,14 @@ class Glove_WSD(pl.LightningModule):
         
         embeds = self.dropout(embeds)
 
-        #embeds = torch.nn.utils.rnn.pack_padded_sequence(
-            #embeds, labels, batch_first=True, enforce_sorted=False)
+        
 
         lstm_out, _ = self.lstm(embeds)
 
-        #output_padded, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-            #lstm_out, batch_first=True)
+        
         
         output_padded = utils.get_senses_vector(lstm_out, idx, None)
 
-        
         output_padded = self.lin_dropoout(output_padded)
 
         labels_space = self.hidden2labels(output_padded)
@@ -127,19 +124,19 @@ class Glove_WSD(pl.LightningModule):
         outputs = self(**train_batch)
 
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
-                               train_batch["labels"].view(-1))#, ignore_index=-100)
+                               train_batch["labels"].view(-1))
         self.log_dict({'train_loss': loss}, batch_size=utilz.BATCH_SIZE,
                       on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, idx):
         outputs = self(**val_batch)
-        # print(outputs.size())
         y_pred = outputs.argmax(dim=1)
-        # print(val_batch["labels"].size())
+        
 
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                val_batch["labels"].view(-1), ignore_index=-100)
+        
         self.val_metric(y_pred, val_batch["labels"])
         self.log_dict({'val_loss': loss, 'valid_f1': self.val_metric},
                       batch_size=utilz.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
@@ -148,11 +145,7 @@ class Glove_WSD(pl.LightningModule):
 
         outputs = self(**test_batch)
         y_pred = outputs.argmax(dim=1)
-        #predicted_labels = utilz.idx_to_label(
-        #    self.label_list, y_pred.tolist())
-        # print("RES: " + str(predicted_labels))
-        # print(utilz.idx_to_label(
-        #            self.label_list, test_batch["labels"].tolist()))
+        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                test_batch["labels"].view(-1), ignore_index=-100)
 
