@@ -12,18 +12,13 @@ from allennlp.modules import elmo
 
 
 class Elmo_WSD(pl.LightningModule):
-    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, num_labels: int, layers_num: int, embedding,label_list, lin_lr, elmo_lr, embed_dropout,lin_dropout,lin_wd,elmo_wd):
+    def __init__(self,hidden_dim: int, num_labels: int, lin_lr, elmo_lr,dropout,lin_wd,elmo_wd):
         """Init class for the WSD classifier with elmo
 
         Args:
 
         hidden_dim    (int): Hidden dimension
         num_labels    (int): Number of classes
-        embedding_dim (int): useless parameter, left for error
-        vocab_size    (int): useless parameter, left for error
-        layers_num    (int): useless parameter, left for error
-        embedding     (int): useless parameter, left for error 
-        label_list    (int): useless parameter, left for error
         lin_dropout   (float): dropout for the linear layer
         lin_lr        (float): learning rate for the linear layer
         elmo_lr       (float): learning rate for ELMo
@@ -38,14 +33,14 @@ class Elmo_WSD(pl.LightningModule):
         self.num_labels = num_labels
         self.lin_lr = lin_lr
         self.elmo_lr = elmo_lr
-        self.lin_dropout = nn.Dropout(lin_dropout)
+        self.lin_dropout = nn.Dropout(dropout)
         self.lin_wd = lin_wd
         self.elmo_wd = elmo_wd
         
         self.elmo = elmo.Elmo(os.path.join(utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_options.json"), os.path.join(
             utilz.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=True,keep_sentence_boundaries=False,do_layer_norm=True)
         
-        self.hidden2labels = nn.Linear(hidden_dim, num_labels)
+        self.hidden2labels = nn.Linear(2*hidden_dim, num_labels) #2* is due to a coding error in a previous version. This mean that the given hidden dim shoul be the half of the true value
         
         self.val_metric = torchmetrics.F1Score(
             task="multiclass", num_classes=num_labels, average='micro')
