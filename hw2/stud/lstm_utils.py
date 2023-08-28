@@ -10,17 +10,18 @@ from allennlp.modules.elmo import batch_to_ids
 
 NUM_WORKERS = 12
 EPOCHS_NUM = 500
-DROPOUT_LAYER = [0.5,0.8] #k
+DROPOUT_LAYER = [0.5] #k
 DROPOUT_EMBED = [0.5]
-BATCH_SIZE = 600
+BATCH_SIZE = 600 #BATCH_SIZE = 600 per GloVe, 32 per ELMo
+
 LEARNING_RATE = [1e-2] #i
-LIN_WD = [0,0.001, 0.01]
+LIN_WD = [0]#[0,0.001, 0.01]
 
 ### ELMO HYPERPARAMETERS ###
 
 ELMO_LR = [1e-5] #j
 LAYERS_NUM = 2
-ELMO_WD = [0,0.001, 0.01]
+ELMO_WD = [0.001]#[0,0.001, 0.01]
 
 ### GLOVE HYPERPARAMETERS ###
 
@@ -28,8 +29,8 @@ EMBEDDING_DIM = 300
 HIDDEN_DIM = 150
 BIDIRECTIONAL = True
 DROPOUT_LSTM = 0.2
-LSTM_LR = [1e-3]
-LSTM_WD = [0,0.001, 0.01]
+LSTM_LR = [1e-2]
+LSTM_WD = [0.001]#[0,0.001, 0.01]
 
 ############################
 

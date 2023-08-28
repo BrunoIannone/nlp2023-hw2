@@ -12,23 +12,27 @@ from torchtext.vocab import GloVe
 
 
 class Glove_WSD(pl.LightningModule):
-    def __init__(self,embedding_dim, hidden_dim: int, num_labels: int, layers_num: int,lin_lr, lstm_lr, embed_dropout,lin_dropout,lin_wd,lstm_wd):
-
-        super().__init__()
-
-        """Init class for the BIO classifier
+    def __init__(self,embedding_dim: int, hidden_dim: int, num_labels: int, layers_num: int,lin_lr, lstm_lr: float, embed_dropout: float,lin_dropout: float,lin_wd: float,lstm_wd: float):
+        """Init class for WSD classifier with glove
 
         Args:
         embedding_dim (int): Embedding dimension
         hidden_dim (int): Hidden dimension
-        vocab_size (int): Vocabulary size
         num_labels (int): Number of classes
         layers_num (int): Number of layers of the LSTM
+        lin_lr        (float): learning rate for the linear layer
+        lstm_lr       (float): learning rate for the LSTM
+        embed_dropout (float): dropout on the embedding (input of the LSTM)
+        lin_dropout   (float): dropout for the linear layer
+        lin_wd        (float): weight decay for the linear layer
+        lstm_wd       (float): weight decay for the LSTM
         """
+        super().__init__()
+
+        
         self.layers_num = layers_num
         self.hidden_dim = hidden_dim
         self.num_labels = num_labels
-
         self.lin_lr = lin_lr
         self.embedding_dim = embedding_dim
         self.lstm_lr = lstm_lr
@@ -36,12 +40,10 @@ class Glove_WSD(pl.LightningModule):
         self.lin_dropoout = nn.Dropout(lin_dropout)
         self.lin_wd = lin_wd
         self.lstm_wd = lstm_wd
-        #if (embedding):  # note that the vocabulary must have an entry for padding and unk
-        #    self.word_embeddings = nn.Embedding.from_pretrained(
-        #        embedding, freeze=True)
+               
         
         self.word_embeddings = GloVe(name="840B", cache = os.path.join(utils.DIRECTORY_NAME,"glove.840B"),dim = 300)
-        #self.embedding = nn.Embedding.from_pretrained(os.path.join(utils.DIRECTORY_NAME,"glove.6B/glove.6B.50d.txt"))
+
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, layers_num,
                            bidirectional=utils.BIDIRECTIONAL, batch_first=True,dropout = utils.DROPOUT_LSTM)
         
@@ -51,6 +53,7 @@ class Glove_WSD(pl.LightningModule):
             self.hidden2labels = nn.Linear(2*hidden_dim, num_labels)
         else:
             self.hidden2labels = nn.Linear(hidden_dim, num_labels)
+        
         self.val_metric = torchmetrics.F1Score(
             task="multiclass", num_classes=num_labels, average='micro')
         self.test_metric = torchmetrics.F1Score(
@@ -79,23 +82,17 @@ class Glove_WSD(pl.LightningModule):
         Returns:
             Tensor: Model predictions
         """
-        #print(input_ids.size())
         
         embeds = utils.glove_embedding_tensorization(input_ids,self.word_embeddings)
-        
         embeds = self.dropout(embeds)
 
-        
-
-        lstm_out, _ = self.lstm(embeds)
-
-        
+        lstm_out, _ = self.lstm(embeds)   
         
         output_padded = utils.get_senses_vector(lstm_out, idx, None)
-
         output_padded = self.lin_dropoout(output_padded)
 
         labels_space = self.hidden2labels(output_padded)
+
         return labels_space
 
     def configure_optimizers(self):

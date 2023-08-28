@@ -12,7 +12,7 @@ from allennlp.modules import elmo
 
 
 class Elmo_WSD(pl.LightningModule):
-    def __init__(self,hidden_dim: int, num_labels: int, lin_lr, elmo_lr,dropout,lin_wd,elmo_wd):
+    def __init__(self,hidden_dim: int, num_labels: int, lin_lr:float, elmo_lr: float,dropout: float,lin_wd: float,elmo_wd: float):
         """Init class for the WSD classifier with elmo
 
         Args:
