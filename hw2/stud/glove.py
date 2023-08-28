@@ -1,7 +1,6 @@
 from typing import Any
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import nn
-import time
 import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
@@ -9,12 +8,11 @@ import os
 import lstm_utils as utils
 import torchmetrics
 import utilz
-from allennlp.modules import elmo,elmo_lstm
 from torchtext.vocab import GloVe
 
 
 class Glove_WSD(pl.LightningModule):
-    def __init__(self, embedding_dim: int, hidden_dim: int, vocab_size: int, num_labels: int, layers_num: int, embedding,label_list, lin_lr, lstm_lr, embed_dropout,lin_dropout,lin_wd,lstm_wd):
+    def __init__(self,embedding_dim, hidden_dim: int, num_labels: int, layers_num: int,lin_lr, lstm_lr, embed_dropout,lin_dropout,lin_wd,lstm_wd):
 
         super().__init__()
 
@@ -26,12 +24,11 @@ class Glove_WSD(pl.LightningModule):
         vocab_size (int): Vocabulary size
         num_labels (int): Number of classes
         layers_num (int): Number of layers of the LSTM
-        device (str): Device for calculation
         """
         self.layers_num = layers_num
         self.hidden_dim = hidden_dim
         self.num_labels = num_labels
-        self.label_list = label_list
+
         self.lin_lr = lin_lr
         self.embedding_dim = embedding_dim
         self.lstm_lr = lstm_lr
