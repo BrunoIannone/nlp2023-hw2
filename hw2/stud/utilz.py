@@ -5,12 +5,13 @@ from transformers import AutoTokenizer
 import torch
 import time
 
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 NUM_WORKERS = 12
-LEARNING_RATE = 1e-3
-weight_decay = 0.002
-transformer_learning_rate = 1e-5
-transformer_weight_decay = 0
+LEARNING_RATE = [1e-3]
+weight_decay = [0,0.001,0.1]
+transformer_learning_rate = [1e-5]
+transformer_weight_decay = [0,0.001,0.1]
+LIN_DROPOUT = [0.2,0.5,0.8]
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -143,12 +144,12 @@ def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
     return res
 
 
-def build_all_senses(file_path):
+def build_all_senses(file_path:str, fine_grained:bool = False):
     """Get all senses from the mapping file
 
     Args:
         file_path (str): file containing coarse-grained mapping
-
+        fine_grained (bool): True for fine grained operations. Default = False
     Returns:
         List[List[str]]: List of list of senses
     """
@@ -161,10 +162,16 @@ def build_all_senses(file_path):
     data = json.load(f)
     
     for json_line in data:
-        # senses.append({json_line:data[json_line]}) uncomment for fine grained operations
-        
-        # converting to list because of vocabulary function input type
-        senses.append([json_line])
+        if fine_grained:
+            for sense in data[json_line]:
+                for key in sense:
+                    senses.append([key])# converting to list because of vocabulary function input type
+
+                    #print(key)
+                    
+        else:
+            senses.append([json_line])# converting to list because of vocabulary function input type
+
 
     f.close()
     return senses
@@ -305,27 +312,48 @@ def get_senses_vector(model_output, tensor_idx, word_ids):
     Returns:
         Tensor: The stacked tensor of all target words embedding
     """
-    idx = get_idx_from_tensor(tensor_idx)
+    #idx = get_idx_from_tensor(tensor_idx)
     res = []
+    test_res = []
     # print(model_output.size())
 
     for i in range(model_output.size(0)):
         # print(idx[i])
-
-        for elem in range(len(idx[i])):
-            
+        for elem in tensor_idx[i]:
+            if elem ==-1:
+                break
             #res.append(model_output[i][0])
             
            
-            original_index = idx[i][elem]
+            original_index = elem
             
             shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
             next_word = int(word_ids[i][original_index + 2]) #+1 from [CLS] +1 for next word
             word_lenght = next_word - shifted_index
-            res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
+            test_res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
+          
+        
+        
+    #     for elem in range(len(idx[i])):
             
-    res = torch.stack(res, dim=0)
-    return res
+    #         #res.append(model_output[i][0])
+            
+           
+    #         original_index = idx[i][elem]
+            
+    #         shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
+    #         next_word = int(word_ids[i][original_index + 2]) #+1 from [CLS] +1 for next word
+    #         word_lenght = next_word - shifted_index
+    #         res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
+            
+    # res = torch.stack(res, dim=0)
+    test_res = torch.stack(test_res, dim=0)
+    # if(not torch.eq(res,test_res)):
+    #     print("DIVERSI DIOC")
+    #     time.sleep(5)
+    # else:
+    #     print("AHA!!!!!!")
+    return test_res
 
 
 def str_to_int(str_dict_key: dict) ->dict :

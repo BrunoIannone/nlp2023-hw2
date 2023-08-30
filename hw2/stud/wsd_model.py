@@ -3,7 +3,6 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, STEP_OUTPUT, TRA
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel, BertForTokenClassification,AutoModelForTokenClassification,optimization
-from sklearn.svm import LinearSVC
 #import stud.utilz as utilz
 import utilz
 import pytorch_lightning as pl
@@ -11,11 +10,15 @@ import time
 import torchmetrics
 
 class WSD(pl.LightningModule): 
-    def __init__(self, language_model_name: str, num_labels: int, idx_to_labels:dict,fine_tune_lm: bool = True,*args, **kwargs) -> None:
+    def __init__(self, language_model_name: str, num_labels: int, idx_to_labels:dict,fine_tune_lm: bool = True,lin_lr = 0, backbone_lr = 0,lin_wd = 0, backbone_wd = 0, lin_dropout = 0 ,*args, **kwargs) -> None:
         super().__init__()
         self.num_labels = num_labels
         self.idx_to_labels = idx_to_labels
-        
+        self.lin_wd = lin_wd
+        self.backbone_wd = backbone_wd
+        self.lin_lr = lin_lr
+        self.backbone_lr = backbone_lr
+        #self.lin_dropout = lin_dropout
         self.backbone = AutoModel.from_pretrained(language_model_name, output_hidden_states=True,num_labels = num_labels)
         #self.transformer_pos_model = AutoModel.from_pretrained(language_model_name_pos,output_hidden_states=True,num_labels = num_labels)
         #for param in self.transformer_pos_model.parameters():
@@ -24,7 +27,7 @@ class WSD(pl.LightningModule):
         if not fine_tune_lm:
             for param in self.backbone.parameters():
                 param.requires_grad = False
-        self.dropout = torch.nn.Dropout(0.8)
+        self.lin_dropout = torch.nn.Dropout(lin_dropout)
         self.classifier = torch.nn.Linear(
             self.backbone.config.hidden_size, num_labels, bias=True
         )
@@ -58,7 +61,7 @@ class WSD(pl.LightningModule):
         transformers_outputs = self.backbone(**model_kwargs)    
         transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
         transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
-        transformers_outputs_sum = self.dropout(transformers_outputs_sum)
+        transformers_outputs_sum = self.lin_dropout(transformers_outputs_sum)
         logits = self.classifier(transformers_outputs_sum)   
         return logits
 
@@ -68,25 +71,23 @@ class WSD(pl.LightningModule):
         groups = [
           {
                "params": self.classifier.parameters(),
-               "lr": utilz.LEARNING_RATE,
-               "weight_decay": utilz.weight_decay,
+               "lr": self.lin_lr,
+               "weight_decay": self.lin_wd,
             },
            {
                "params": self.backbone.parameters(),
-               "lr": utilz.transformer_learning_rate,
-               "weight_decay": utilz.transformer_weight_decay,
+               "lr": self.backbone_lr,
+               "weight_decay": self.backbone_wd,
            }
             
              
         ]           
-        #optimizer = optimization.Adafactor(groups)
-        #optimizer =torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=utilz.LEARNING_RATE, weight_decay=utilz.weight_decay)
-        #optimizer = torch.optim.Adam(groups)
+        
         optimizer = torch.optim.AdamW(groups)
         
         
         
-        return [optimizer]
+        return optimizer
     
     def training_step(self,train_batch,batch_idx):
 
@@ -95,6 +96,7 @@ class WSD(pl.LightningModule):
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
         
         self.log_dict({'train_loss':loss},on_epoch=True, batch_size=utilz.BATCH_SIZE,on_step=False,prog_bar=True)
+        
         return loss
         
 
@@ -104,6 +106,7 @@ class WSD(pl.LightningModule):
        
        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
+        
         self.val_metric(y_pred,val_batch["labels"])
         self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
     
