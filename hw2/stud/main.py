@@ -21,9 +21,9 @@ import sentence_transformers
 from transformers import AutoModel
 from colorama import Fore
 from termcolor import colored
-CHOICE =  "elmo"#"transformer" #"glove" 
+CHOICE =  "transformer" #"transformer" #"glove" #elmo
 GRAINE =  "fine" #"coarse" #"fine" 
-GLOSS = False
+GLOSS = True
 
 LOG_SAVE_DIR_NAME = "elmo/fine_grained"
 CKPT_SAVE_DIR_NAME= "elmo/fine_grained"
