@@ -5,15 +5,14 @@ import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
 import os
-import lstm_utils as utils
+import rnn_utils as utils
 import torchmetrics
-import transformer_utils
 from torchtext.vocab import GloVe
 
 
 class Glove_WSD(pl.LightningModule):
     def __init__(self,embedding_dim: int, hidden_dim: int, num_labels: int, layers_num: int,lin_lr:float, lstm_lr: float, embed_dropout: float,lin_dropout: float,lin_wd: float,lstm_wd: float):
-        """Init class for WSD classifier with glove
+        """Init class for WSD classifier with GloVe
 
         Args:
         embedding_dim (int): LSTM embedding dimension
@@ -63,21 +62,15 @@ class Glove_WSD(pl.LightningModule):
 
     def forward(
         self,
-        idx,
-        
-        input_ids: torch.Tensor = None,
-        attention_mask: torch.Tensor = None,
-        token_type_ids: torch.Tensor = None,
-        labels: torch.Tensor = None,
-        compute_predictions: bool = False,
-        compute_loss: bool = True,
-        *args,
+        idx:torch.Tensor,
+        input_ids: torch.Tensor,
         **kwargs,
     ) -> torch.Tensor:
         """Model forward pass
 
         Args:
-        sentence (tuple): (Tensor[padded_sentences], List[lenghts (int)]) N.B.: lenghts refers to the original non padded sentences
+            idx (Tensor): Target word indices
+            input_ids (Tensor):Glove input ids
 
         Returns:
             Tensor: Model predictions
@@ -88,12 +81,12 @@ class Glove_WSD(pl.LightningModule):
 
         lstm_out, _ = self.lstm(embeds)   
         
-        output_padded = utils.get_senses_vector(lstm_out, idx, None)
-        output_padded = self.lin_dropoout(output_padded)
+        target_vector = utils.get_target_vector(lstm_out, idx)
+        target_vector = self.lin_dropoout(target_vector)
 
-        labels_space = self.hidden2labels(output_padded)
+        logits = self.hidden2labels(target_vector)
 
-        return labels_space
+        return logits
 
     def configure_optimizers(self):
         groups = [
@@ -113,13 +106,12 @@ class Glove_WSD(pl.LightningModule):
         optimizer = torch.optim.AdamW(groups)
         return optimizer
 
-
     def training_step(self, train_batch, idx) -> STEP_OUTPUT:
         outputs = self(**train_batch)
 
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                train_batch["labels"].view(-1))
-        self.log_dict({'train_loss': loss}, batch_size=transformer_utils.BATCH_SIZE,
+        self.log_dict({'train_loss': loss}, batch_size= utils.GLOVE_BATCH_SIZE,
                       on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
@@ -127,13 +119,12 @@ class Glove_WSD(pl.LightningModule):
         outputs = self(**val_batch)
         y_pred = outputs.argmax(dim=1)
         
-
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                val_batch["labels"].view(-1), ignore_index=-100)
         
         self.val_metric(y_pred, val_batch["labels"])
         self.log_dict({'val_loss': loss, 'valid_f1': self.val_metric},
-                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=utils.GLOVE_BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
 
     def test_step(self, test_batch, idx):
 
@@ -145,4 +136,4 @@ class Glove_WSD(pl.LightningModule):
 
         self.test_metric(y_pred, test_batch["labels"])
         self.log_dict({'test_loss': loss, 'loss_f1': self.test_metric},
-                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=utils.GLOVE_BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)

@@ -13,8 +13,8 @@ class Vocabulary():
         Args:
             sentences (List[List[str]]): List of list of sentence tokens
             labels (List[List[str]]): List of list of sentences token labels
-            save_vocab (bool, optional): True if the vocabulary needs to be saved (as .txt). Default to False.
-            build_tokens_vocabulary (bool, optional): True if word_to_idx and idx_to_word vocabularies are needed. Default to False
+            save_vocab (bool): True if the vocabulary needs to be saved (as .txt). Default to False.
+            build_tokens_vocabulary (bool): True if word_to_idx and idx_to_word vocabularies are needed. Default to False
 
 
         """
@@ -35,7 +35,11 @@ class Vocabulary():
 
     
     def save_routine(self,build_tokens_vocabulary: bool = False):
-        
+        """Aux function if save_vocab = True. Saves chosen vocabs in a .txt file
+
+        Args:
+            build_tokens_vocabulary (bool, optional): If True, saves to .txt  word_to_idx and idx_to_word vocabularies. Defaults to False.
+        """
         if(build_tokens_vocabulary):
             with open("word_to_idx.txt", "a") as fp:
                 json.dump(self.word_to_idx, fp)
@@ -86,7 +90,7 @@ class Vocabulary():
         }
 
     def build_labels_vocabulary(self, sentences_labels: List[List[str]]):
-        #print(sentences_labels)
+        
         """Create two different vocabularies from sentence labels for label to vocabulary index and viceversa.
         N.B.: padding will have the bigger index
 

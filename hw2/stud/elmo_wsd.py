@@ -5,9 +5,8 @@ import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
 import os
-import lstm_utils as utils
+import rnn_utils as utils
 import torchmetrics
-import transformer_utils
 from allennlp.modules import elmo
 
 
@@ -35,8 +34,8 @@ class Elmo_WSD(pl.LightningModule):
         self.lin_wd = lin_wd
         self.elmo_wd = elmo_wd
         
-        self.elmo = elmo.Elmo(os.path.join(transformer_utils.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_options.json"), os.path.join(
-            transformer_utils.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=True,keep_sentence_boundaries=False,do_layer_norm=True)
+        self.elmo = elmo.Elmo(os.path.join(utils.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_options.json"), os.path.join(
+            utils.DIRECTORY_NAME, "../../model/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5"), num_output_representations=2,requires_grad=True,keep_sentence_boundaries=False,do_layer_norm=True)
         
         self.hidden2labels = nn.Linear(2*hidden_dim, num_labels) #2* is due to a coding error in a previous version. This mean that the given hidden dim should be the half of the true value
         
@@ -49,15 +48,8 @@ class Elmo_WSD(pl.LightningModule):
 
     def forward(
         self,
-        idx,
-        input_ids: torch.Tensor = None,
-        
-        attention_mask: torch.Tensor = None,
-        token_type_ids: torch.Tensor = None,
-        labels: torch.Tensor = None,
-        compute_predictions: bool = False,
-        compute_loss: bool = True,
-        *args,
+        idx: torch.Tensor,
+        input_ids: torch.Tensor,
         **kwargs,
     ) -> torch.Tensor:
         """Model forward pass
@@ -70,12 +62,12 @@ class Elmo_WSD(pl.LightningModule):
         """
         embeds = self.elmo(input_ids)
         
-        output_padded = utils.get_senses_vector(embeds['elmo_representations'][-1], idx, None)
-        output_padded = self.lin_dropout(output_padded)
+        target_vector = utils.get_target_vector(embeds['elmo_representations'][-1], idx)
+        target_vector = self.lin_dropout(target_vector)
 
-        labels_space = self.hidden2labels(output_padded)
+        logits = self.hidden2labels(target_vector)
         
-        return labels_space
+        return logits
 
     def configure_optimizers(self):
         groups = [
@@ -100,7 +92,7 @@ class Elmo_WSD(pl.LightningModule):
 
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                train_batch["labels"].view(-1))
-        self.log_dict({'train_loss': loss}, batch_size=transformer_utils.BATCH_SIZE,
+        self.log_dict({'train_loss': loss}, batch_size=utils.ELMO_BATCH_SIZE,
                       on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
@@ -113,7 +105,7 @@ class Elmo_WSD(pl.LightningModule):
         
         self.val_metric(y_pred, val_batch["labels"])
         self.log_dict({'val_loss': loss, 'valid_f1': self.val_metric},
-                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=utils.ELMO_BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
 
     def test_step(self, test_batch, idx):
 
@@ -125,4 +117,4 @@ class Elmo_WSD(pl.LightningModule):
 
         self.test_metric(y_pred, test_batch["labels"])
         self.log_dict({'test_loss': loss, 'loss_f1': self.test_metric},
-                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=utils.ELMO_BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)

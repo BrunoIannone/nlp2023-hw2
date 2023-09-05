@@ -62,6 +62,7 @@ def build_data_from_json(file_path: str, save_words: bool = False):
         
         samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
         "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        #samples.append({"words": data[json_line]["words"],"senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
         
         if (save_words):
             words.append(data[json_line]["words"])
@@ -136,13 +137,55 @@ def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
                     break
             if not modified:
                 res[word_idx] = labels_to_idx['O']
-
+        
         else:
             
             res[word_idx] = labels_to_idx[target_word_idx[word_idx][0]]
     
     return res
 
+def build_all_senses_with_gloss(file_path:str, sentence_model: None,fine_grained:bool = False):
+    """Get all senses from the mapping file
+
+    Args:
+        file_path (str): file containing coarse-grained mapping
+        fine_grained (bool): True for fine grained operations. Default = False
+    Returns:
+        List[List[str]]: List of list of senses
+    """
+    try:
+        f = open(file_path, 'r')
+    except OSError:
+        print("Unable to open file in " + str(file_path))
+    if fine_grained and sentence_model != None:
+        res = {}
+    else:
+        res = []
+    data = json.load(f)
+    
+    for json_line in data:
+        #print(data[json_line])
+        if fine_grained:
+            res[json_line] = []
+            for sense in data[json_line]:
+                for key in sense:
+                    #print(sense[key])
+                    batch_out = TOKENIZER(sense[key],return_tensors = "pt", is_split_into_words = False)
+                    embedding = sentence_model(**batch_out)
+                    embedding = torch.stack(embedding.hidden_states[-4:], dim=0).sum(dim=0).squeeze().detach()
+                    #print(embedding[0].size())
+                    res[json_line].append({key:embedding[0]}) 
+                    #print(res)
+                    #break
+                #break
+            #break
+        else:
+            res.append([json_line])# converting to list because of vocabulary function input type
+
+        
+    f.close()
+    
+    return res
 def build_all_senses(file_path:str,fine_grained:bool = False):
     """Get all senses from the mapping file
 
@@ -156,21 +199,27 @@ def build_all_senses(file_path:str,fine_grained:bool = False):
         f = open(file_path, 'r')
     except OSError:
         print("Unable to open file in " + str(file_path))
-    
-    res = []
+    if fine_grained:
+        res = {}
+    else:
+        res = []
     data = json.load(f)
     
     for json_line in data:
-        
+        #print(data[json_line])
         if fine_grained:
-            
+            res[json_line] = []
             for sense in data[json_line]:
                 for key in sense:
                     
-                    res.append([key]) # converting to list because of vocabulary function input type         
+                    #print(embedding[0].size())
+                    res[json_line].append(key) 
+                    
+            #break
         else:
-            res.append([json_line]) # converting to list because of vocabulary function input type
-   
+            res.append([json_line])# converting to list because of vocabulary function input type
+
+        
     f.close()
     
     return res
@@ -246,6 +295,7 @@ def map_new_index(batch:List[dict], batch_out:dict):
         res, batch_first=True, padding_value=-1) # -1 is the chosen pad value
     return word_ids_
 
+#import sentence_transformers
 def extract_labels_and_sense_indices(batch: List[dict]):
     """Extract labels (senses) and target word indices for all the sentences
 
@@ -255,14 +305,20 @@ def extract_labels_and_sense_indices(batch: List[dict]):
     Returns:
         tuple: (labels , indices) where both values are tensors
     """
+    #sentence_model = sentence_transformers.SentenceTransformer('all-mpnet-base-v2')
     labels = []
     idx = []
+    embedding = []
     for sentence in batch:
 
+        #print(sentence)
         label = sentence["sample"]["senses"]
-        
+        #print(label)
+        #time.sleep(5)
         temp = []
+
         for index in label:
+            #embedding.append(sentence_model.encode(sentence["sample"]["words"]))
             temp.append(int(index))
             labels.append(label[index])
 
@@ -288,14 +344,53 @@ def get_idx_from_tensor(tensor_idx):
     """
     idx = []
     for row in tensor_idx:
+        # print(row)
         temp = []
         for elem in row:
             if elem == -1: # -1 is the chosen pad value
                 break
             temp.append(int(elem))
         idx.append(tuple(temp))
+        # print(idx)
+        # time.sleep(2)
 
     return idx
+
+def get_senses_vector_fine(model_output, tensor_idx, word_ids):
+    """This function extracts the vector embedding for each target words for each sentence
+
+    Args:
+        model_output (Tensor): transformer output tensor
+        tensor_idx (Tensor): Tensor where each row contains all sentence original target word indices
+        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after subwords tokenizations)
+    Returns:
+        Tensor: The stacked tensor of all target words embedding
+    """
+    
+    res = []
+    cls = []
+    
+    
+
+    for i in range(model_output.size(0)):
+        
+        for elem in tensor_idx[i]:
+            if elem ==-1:
+                break
+            original_index = elem
+            
+            shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
+            next_word = int(word_ids[i][original_index + 2]) #+1 from [CLS] +1 for next word
+            word_lenght = next_word - shifted_index
+            res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
+            cls.append(model_output[i][0])
+        
+        
+    
+    res = torch.stack(res, dim=0)
+    cls = torch.stack(cls, dim=0)
+    
+    return res,cls
 
 def get_target_vector(model_output, tensor_idx, word_ids):
     """This function extracts the vector embedding for each target words for each sentence
@@ -309,19 +404,26 @@ def get_target_vector(model_output, tensor_idx, word_ids):
     """
     res = []
     
+    
+    
+
     for i in range(model_output.size(0)):
         for elem in tensor_idx[i]:
             if elem ==-1:
                 break
             
-            original_index = elem
-            shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
             
+           
+            original_index = elem
+            
+            shifted_index = int(word_ids[i][original_index+1]) #the +1 takes in account the shift given by [CLS] token
             next_word = int(word_ids[i][original_index + 2]) #+1 from [CLS] +1 for next word
             word_lenght = next_word - shifted_index
-            
             res.append((torch.sum(model_output[i][shifted_index: shifted_index + word_lenght], dim=0)/word_lenght))
             
+        
+        
+    
     res = torch.stack(res, dim=0)
     
     return res
@@ -354,12 +456,14 @@ def idx_to_label(idx_to_labels: dict, src_label: List[List[int]]):
     """
     out_label = []
     
+    
     for label in src_label:
 
         if '<pad>' == idx_to_labels[int(label)]:
             out_label.append("O")
         else:
             out_label.append(idx_to_labels[label])
+
 
     return out_label
 

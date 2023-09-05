@@ -1,15 +1,15 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-import transformer_utils
+import rnn_utils 
 import wsddataset
 
 class WsdDataModule(LightningDataModule):
-    """Datamodule for WSD with tensor-based models
+    """Datamodule for WSD with GloVe
 
-    
     """
     def __init__(self,training_data:dict, valid_data:dict, test_data:dict,labels_to_idx:dict):
-        """Init function for WSD datamodule with tensor-based models
+        
+        """Init function for WSD datamodule with GloVe
 
         Args:
             training_data (dict): {sample:{List[sample_dicts]}} for training
@@ -17,8 +17,9 @@ class WsdDataModule(LightningDataModule):
             test_data (dict): {sample:{List[sample_dicts]}} for test
             labels_to_idx (dict):  dictionary with structure {label:index} 
         """
-        super().__init__()
         
+        super().__init__()
+    
         self.training_data = training_data
         self.valid_data = valid_data
         self.test_data = test_data
@@ -34,24 +35,24 @@ class WsdDataModule(LightningDataModule):
         
         return DataLoader(
             self.train_dataset,
-            batch_size = transformer_utils.BATCH_SIZE,
-            num_workers = transformer_utils.NUM_WORKERS,
+            batch_size = rnn_utils.GLOVE_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=transformer_utils.collate_fn
+            collate_fn=rnn_utils.collate_fn_glove
         ) 
     def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
-            batch_size = transformer_utils.BATCH_SIZE,
-            num_workers = transformer_utils.NUM_WORKERS,
+            batch_size = rnn_utils.GLOVE_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=transformer_utils.collate_fn
+            collate_fn=rnn_utils.collate_fn_glove
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size = transformer_utils.BATCH_SIZE,
-            num_workers = transformer_utils.NUM_WORKERS,
+            batch_size = rnn_utils.GLOVE_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=transformer_utils.collate_fn
+            collate_fn=rnn_utils.collate_fn_glove
         )

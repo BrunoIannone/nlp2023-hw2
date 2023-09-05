@@ -1,10 +1,23 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-import lstm_utils
+import rnn_utils
 import wsddataset
 
 class WsdDataModule(LightningDataModule):
-    def __init__(self,training_data, valid_data, test_data,labels_to_idx):
+    """Datamodule for WSD with ELMo
+
+    
+    """
+    def __init__(self,training_data:dict, valid_data:dict, test_data:dict,labels_to_idx:dict):
+        
+        """Init function for WSD datamodule with ELMo
+
+        Args:
+            training_data (dict): {sample:{List[sample_dicts]}} for training
+            valid_data (dict): {sample:{List[sample_dicts]}} for valid
+            test_data (dict): {sample:{List[sample_dicts]}} for test
+            labels_to_idx (dict):  dictionary with structure {label:index} 
+        """
         super().__init__()
     
         self.training_data = training_data
@@ -22,24 +35,24 @@ class WsdDataModule(LightningDataModule):
         
         return DataLoader(
             self.train_dataset,
-            batch_size = lstm_utils.ELMO_BATCH_SIZE,
-            num_workers = lstm_utils.NUM_WORKERS,
+            batch_size = rnn_utils.ELMO_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=rnn_utils.collate_fn_elmo
         ) 
     def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
-            batch_size = lstm_utils.ELMO_BATCH_SIZE,
-            num_workers = lstm_utils.NUM_WORKERS,
+            batch_size = rnn_utils.ELMO_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=rnn_utils.collate_fn_elmo
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size = lstm_utils.ELMO_BATCH_SIZE,
-            num_workers = lstm_utils.NUM_WORKERS,
+            batch_size = rnn_utils.ELMO_BATCH_SIZE,
+            num_workers = rnn_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=lstm_utils.collate_fn_elmo
+            collate_fn=rnn_utils.collate_fn_elmo
         )

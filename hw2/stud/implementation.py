@@ -2,18 +2,14 @@ import numpy as np
 from typing import List, Dict
 import stud.wsd_model as wsd_model
 from model import Model
-from transformers import AutoTokenizer,AutoModel
 import os
-import transformer_utils
+import stud.transformer_utils as transformer_utils
 import json
-import pytorch_lightning as pl
 from typing import List
-import stud.wsddataset as wsddataset
-from torch.utils.data import DataLoader
 import torch
 import os
 import time
-import torch.nn.functional as F
+
 
 def build_model(device: str) -> Model:
     # STUDENT: return StudentModel()
@@ -82,6 +78,14 @@ class StudentModel(Model):
         return vocab
     
     def predict(self, samples: List[Dict]) -> List[List[str]]:
+        """Predict function
+
+        Args:
+            samples (List[Dict]): List of sample dicts
+
+        Returns:
+            List[List[str]]: Predicted labels
+        """
         self.model.eval()
         
         res = []
@@ -92,18 +96,21 @@ class StudentModel(Model):
 
         return res
     
-    def predict_(self,sample): #TODO: documentation missing
-        
+    def predict_(self,sample:dict):
+        """Aux finction fot prediction
+
+        Args:
+            sample (dict): Sample dict
+
+        Returns:
+            List[str]: Predicted labels
+        """
         unknown_candidates = []
         modified = False
 
         for candidate in sample["candidates"]:
-            if len(sample["candidates"][candidate]) == 1 and sample["candidates"][candidate][0] in self.vocab["labels_to_idx"].keys():
+            if len(sample["candidates"][candidate]) == 1 :
             
-                unknown_candidates.append(0)
-            
-            elif len(sample["candidates"][candidate]) == 1 and sample["candidates"][candidate][0] not in self.vocab["labels_to_idx"].keys():
-
                 unknown_candidates.append(sample["candidates"][candidate][0])
             
             else: 
@@ -142,74 +149,3 @@ class StudentModel(Model):
     
     
     
-    def max_result(self,y_pred,known_candidate):
-        max = -1
-        res = None
-        print(known_candidate)
-        #time.sleep(5)
-        for candidate in known_candidate:
-            if y_pred[0][candidate] > max and y_pred[0][candidate] > 0.51 :
-                res = candidate
-                max = y_pred[0][candidate]
-        return res
-
-
-    
-    def predict__(self,sample):
-        res = []
-        for target in sample["candidates"]:
-            #print(sample["candidates"][target])
-            if len(sample["candidates"][target]) == 1:
-                res.append(sample["candidates"][target][0])
-            elif all(candidate in self.vocab["labels_to_idx"].keys() for candidate in sample["candidates"][target]):
-                
-                
-                sample["senses"] = transformer_utils.label_to_idx(self.vocab["labels_to_idx"],  {target : sample["candidates"][target]})
-                sample_ = {"sample": sample}
-            
-                batch = transformer_utils.collate_fn([sample_]).to(self.device)
-           
-                y_pred = self.model(**batch)
-                print(sample["senses"])
-                time.sleep(5)
-                y_pred_temp = self.max_result(y_pred,[sample["senses"][target]])
-                if y_pred_temp == None:
-                    y_pred = y_pred.argmax(dim = 1)
-                    predicted_labels = transformer_utils.idx_to_label(
-                    list(self.vocab["labels_to_idx"].keys()), [y_pred])
-                    res.append(predicted_labels)
-                else:
-                    predicted_labels = transformer_utils.idx_to_label(
-                    list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
-                    res.append(predicted_labels)
-            else:
-                known_candidate = []
-                unknown_candidate = []
-                for candidate in sample["candidates"][target]:
-                    #print(candidate)
-                    if candidate in self.vocab["labels_to_idx"].keys():
-                        known_candidate.append(self.vocab["labels_to_idx"][candidate])
-                    else:
-                        #print(target,candidate)
-
-                        unknown_candidate.append(candidate)
-                if(known_candidate == []):
-                    res.append(unknown_candidate[0])
-                    continue
-                #print(sample["candidates"][target])
-                sample["senses"] = transformer_utils.label_to_idx(self.vocab["labels_to_idx"], {target : sample["candidates"][target]})
-                sample_ = {"sample": sample}
-            
-                batch = transformer_utils.collate_fn([sample_]).to(self.device)
-           
-                y_pred = F.softmax(self.model(**batch),dim = 1)
-                #print(y_pred,y_pred.size())
-                y_pred_temp = self.max_result(y_pred,known_candidate)
-                if y_pred_temp == None:
-                    res.append(unknown_candidate[0])
-                else:
-                    predicted_labels = transformer_utils.idx_to_label(
-                    list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
-                    res.append(predicted_labels)
-
-        return res

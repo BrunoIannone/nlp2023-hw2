@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset
-#import stud.utilz as utilz
+#import stud.transformer_utils as transformer_utils
 import  transformer_utils
 
 from typing import List
@@ -26,7 +26,7 @@ class WsdDataset(Dataset):
         """Return samples length
 
         Returns:
-            int: length of samples list (number of samples)_
+            int: length of samples list (number of samples)
         """
         return len(self.samples)
 
@@ -41,11 +41,10 @@ class WsdDataset(Dataset):
             dict: {"sample": sample_dict} related to the index-th element with senses converted into their indices
         """
         
-        #converte index-th sample senses in indices
+        #convert index-th sample senses in indices
         self.samples[index]["senses"] = transformer_utils.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
         return {
             
             "sample": self.samples[index],
-            #"senses": utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
     
         }

@@ -3,32 +3,26 @@ import os
 import vocabulary
 import time
 import wsd_model as mod
-import wsd_model_fine
 import pytorch_lightning as pl
 import transformer_utils
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 import datamodule
-import lstm_datamodule
+import glove
+import glove_datamodule
 import torch
 import elmo_wsd
 import elmo_datamodule
-import lstm_utils as utils
-#import glove
+import rnn_utils as utils
 from itertools import product
 import tqdm
-#import sentence_transformers
-from transformers import AutoModel
-from colorama import Fore
 from termcolor import colored
 
-CHOICE =  "elmo" #"transformer" #"glove" #elmo
-GRAINE =  "coarse" #"coarse" #"fine" 
-GLOSS = False
+CHOICE =  "elmo" # {"transformer", "glove", "elmo"}
+GRAINE =  "fine"     # {"coarse", "fine"}
 
-LOG_SAVE_DIR_NAME = "elmo/coarse"
-CKPT_SAVE_DIR_NAME= "elmo/coarse"
-
+LOG_SAVE_DIR_NAME = "elmo/coarse_smoke_test"
+CKPT_SAVE_DIR_NAME= "elmo/coarse_smoke_test"
 
 print(colored(str(("CHOSEN ARCHITECTURE:", CHOICE, "CHOSEN GRAINE:", GRAINE)), "green"))
 
@@ -84,37 +78,17 @@ for hyperparameter in tqdm.tqdm(hyp_comb,colour="yellow", desc="Tried combinatio
             
             senses = transformer_utils.build_all_senses(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),fine_grained=False)
             vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
+            
             print(colored("Built coarse senses and vocab","green"))
             
     else: #GRAINE == "fine" ## Vocab and senses building for fine
         
-        if CHOICE == "transformer" and GLOSS: ## Fine grained with gloss
-            
-            senses = transformer_utils.build_all_senses(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),fine_grained=False)
-            vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
-
-            sentence_model = AutoModel.from_pretrained(transformer_utils.LANGUAGE_MODEL_NAME, output_hidden_states=True, num_labels = 2210)
-            
-            fine_senses = transformer_utils.build_all_senses_with_gloss(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),sentence_model=sentence_model,fine_grained=True)        
-            fine_vocab = vocabulary.Vocabulary(labels=[[key] for fine in fine_senses.values() for dict in fine for key in dict],save_vocab=False)
-            print(colored("Built  senses and vocab for fine senses with gloss","green"))
+        fine_senses = transformer_utils.build_all_senses(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),fine_grained=True)
+        fine_vocab = vocabulary.Vocabulary(labels=fine_senses,save_vocab=False)
         
-        else:
+        print(colored("Built senses and vocab for fine","green"))
+    
 
-            senses = transformer_utils.build_all_senses(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),fine_grained=False)
-            fine_senses = transformer_utils.build_all_senses(os.path.join(transformer_utils.DIRECTORY_NAME,"../../data/map/coarse_fine_defs_map.json"),fine_grained=True)
-            
-            vocab = vocabulary.Vocabulary(labels=senses,save_vocab=False)
-            fine_vocab = vocabulary.Vocabulary(labels=[[sense] for fine in fine_senses.values() for sense in fine],save_vocab=False)
-            print(colored("Built senses and vocab for fine","green"))
-        
-    # sentence = "I LOVE DICKS"
-    # tokenized_sentence = utilz.TOKENIZER(sentence, return_tensors = "pt", is_split_into_words = False )
-    # print(tokenized_sentence)
-    # embedding = sentence_model(**tokenized_sentence)
-    # sum = torch.stack(embedding.hidden_states[-4:], dim=0).sum(dim=0).squeeze()
-    # print(sum[0].size())
-    # time.sleep(100)
     
     
 
@@ -133,6 +107,7 @@ for hyperparameter in tqdm.tqdm(hyp_comb,colour="yellow", desc="Tried combinatio
 
     logger = TensorBoardLogger(os.path.join(transformer_utils.DIRECTORY_NAME,"tb_logs/"+LOG_SAVE_DIR_NAME) + str(lin_lr) + ", " + str(backbone_lr) + ", " + str(dropout)+ ", " + str(lin_dropout)+ ", " + str(lin_wd) + ", " + str(backbone_wd))
     trainer = pl.Trainer(log_every_n_steps=50,max_epochs = transformer_utils.NUM_EPOCHS,callbacks=[EarlyStopping(monitor="val_loss", patience=5,mode='min'), ModelCheckpoint(filename= str(lin_lr) + ", " + str(backbone_lr) + ", " + str(dropout)+ ", " + str(lin_dropout)+ ", " + str(lin_wd) + ", " + str(backbone_wd),monitor='valid_f1',save_top_k=1,every_n_epochs=1,mode='max',save_weights_only=False,verbose=True,dirpath=os.path.join(transformer_utils.DIRECTORY_NAME,'../../model/' + CKPT_SAVE_DIR_NAME))],logger=logger,accelerator='gpu')
+    
     print(colored("Built logger and trainer","green"))
     
     if CHOICE == "transformer": ### TRANSFORMERS ###
@@ -140,7 +115,7 @@ for hyperparameter in tqdm.tqdm(hyp_comb,colour="yellow", desc="Tried combinatio
         if GRAINE == "coarse":
             
             tensor_dm = datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
-            tensor_model = mod.WSD(transformer_utils.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx),vocab.idx_to_labels,fine_tune_lm=False,lin_lr=lin_lr,lin_dropout=lin_dropout,lin_wd=lin_wd,backbone_lr=backbone_lr,backbone_wd = backbone_wd)
+            tensor_model = mod.WSD(transformer_utils.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx),fine_tune_lm=True,lin_lr=lin_lr,lin_dropout=lin_dropout,lin_wd=lin_wd,backbone_lr=backbone_lr,backbone_wd = backbone_wd)
             
             print(colored("Starting transformer coarse training...","green"))
             trainer.fit(tensor_model,datamodule = tensor_dm)
@@ -150,27 +125,27 @@ for hyperparameter in tqdm.tqdm(hyp_comb,colour="yellow", desc="Tried combinatio
             trainer.test(tensor_model,datamodule = tensor_dm)#,ckpt_path="best")
         
         else:
-    
+            
             tensor_fine_dm = datamodule.WsdDataModule(training_data,valid_data,test_data,fine_vocab.labels_to_idx)
-            fine_model = wsd_model_fine.WSD(transformer_utils.LANGUAGE_MODEL_NAME,len(vocab.labels_to_idx),len(fine_vocab.labels_to_idx),vocab.idx_to_labels,fine_vocab.labels_to_idx,fine_senses,fine_tune_lm=False,lin_lr=lin_lr,lin_dropout=lin_dropout,lin_wd=lin_wd,backbone_lr=backbone_lr,backbone_wd = backbone_wd)
+            fine_model = mod.WSD(transformer_utils.LANGUAGE_MODEL_NAME,len(fine_vocab.labels_to_idx),fine_tune_lm=True,lin_lr=lin_lr,lin_dropout=lin_dropout,lin_wd=lin_wd,backbone_lr=backbone_lr,backbone_wd = backbone_wd)
             
             print(colored("Starting transformer fine training...","green"))
             trainer.fit(fine_model,datamodule = tensor_fine_dm)
             
-            print(colored("Starting transformer coarse testing...","green"))
+            print(colored("Starting transformer fine testing...","green"))
             fine_model.eval()
             trainer.test(fine_model,datamodule = tensor_fine_dm)#,ckpt_path="best")
-    
+
     #model = mod.WSD.load_from_checkpoint(os.path.join(utilz.DIRECTORY_NAME, '../../model/0.001, 0.002, 0.01.ckpt'),map_location='cpu', strict=False)
 
     
 
-    if CHOICE == "glove": ### GLOVE ### 
+    elif CHOICE == "glove": ### GLOVE ### 
 
         if GRAINE == "coarse": 
             
             glove_model = glove.Glove_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,len(vocab.labels_to_idx), utils.LAYERS_NUM, lin_lr,backbone_lr,dropout, lin_dropout,lin_wd,backbone_wd)
-            glove_dm = lstm_datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
+            glove_dm = glove_datamodule.WsdDataModule(training_data,valid_data,test_data,vocab.labels_to_idx)
             
             print(colored("Starting glove coarse training...","green"))
             trainer.fit(glove_model,datamodule = glove_dm)
@@ -182,7 +157,7 @@ for hyperparameter in tqdm.tqdm(hyp_comb,colour="yellow", desc="Tried combinatio
         else:
             glove_model = glove.Glove_WSD(utils.EMBEDDING_DIM, utils.HIDDEN_DIM,len(fine_vocab.labels_to_idx), utils.LAYERS_NUM, lin_lr,backbone_lr,dropout, lin_dropout,lin_wd,backbone_wd)
 
-            glove_fine_dm = lstm_datamodule.WsdDataModule(training_data,valid_data,test_data,fine_vocab.labels_to_idx)
+            glove_fine_dm = glove_datamodule.WsdDataModule(training_data,valid_data,test_data,fine_vocab.labels_to_idx)
             
             print(colored("Starting glove fine training...","green"))
             trainer.fit(glove_model,datamodule = glove_fine_dm)
