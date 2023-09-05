@@ -7,19 +7,19 @@ import torch.nn.functional as F
 import os
 import lstm_utils as utils
 import torchmetrics
-import utilz
+import transformer_utils
 from torchtext.vocab import GloVe
 
 
 class Glove_WSD(pl.LightningModule):
-    def __init__(self,embedding_dim: int, hidden_dim: int, num_labels: int, layers_num: int,lin_lr, lstm_lr: float, embed_dropout: float,lin_dropout: float,lin_wd: float,lstm_wd: float):
+    def __init__(self,embedding_dim: int, hidden_dim: int, num_labels: int, layers_num: int,lin_lr:float, lstm_lr: float, embed_dropout: float,lin_dropout: float,lin_wd: float,lstm_wd: float):
         """Init class for WSD classifier with glove
 
         Args:
-        embedding_dim (int): Embedding dimension
-        hidden_dim (int): Hidden dimension
-        num_labels (int): Number of classes
-        layers_num (int): Number of layers of the LSTM
+        embedding_dim (int): LSTM embedding dimension
+        hidden_dim (int): LSTM hidden dimension
+        num_labels (int): Number of labels
+        layers_num (int): LSTM number of layers
         lin_lr        (float): learning rate for the linear layer
         lstm_lr       (float): learning rate for the LSTM
         embed_dropout (float): dropout on the embedding (input of the LSTM)
@@ -119,7 +119,7 @@ class Glove_WSD(pl.LightningModule):
 
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),
                                train_batch["labels"].view(-1))
-        self.log_dict({'train_loss': loss}, batch_size=utilz.BATCH_SIZE,
+        self.log_dict({'train_loss': loss}, batch_size=transformer_utils.BATCH_SIZE,
                       on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
@@ -133,7 +133,7 @@ class Glove_WSD(pl.LightningModule):
         
         self.val_metric(y_pred, val_batch["labels"])
         self.log_dict({'val_loss': loss, 'valid_f1': self.val_metric},
-                      batch_size=utilz.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
 
     def test_step(self, test_batch, idx):
 
@@ -145,4 +145,4 @@ class Glove_WSD(pl.LightningModule):
 
         self.test_metric(y_pred, test_batch["labels"])
         self.log_dict({'test_loss': loss, 'loss_f1': self.test_metric},
-                      batch_size=utilz.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)
+                      batch_size=transformer_utils.BATCH_SIZE, on_epoch=True, on_step=False, prog_bar=True)

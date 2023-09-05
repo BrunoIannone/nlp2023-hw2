@@ -22,7 +22,7 @@ class WsdDataModule(LightningDataModule):
         
         return DataLoader(
             self.train_dataset,
-            batch_size = lstm_utils.BATCH_SIZE,
+            batch_size = lstm_utils.GLOVE_BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
             collate_fn=lstm_utils.collate_fn_glove
@@ -30,7 +30,7 @@ class WsdDataModule(LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
-            batch_size = lstm_utils.BATCH_SIZE,
+            batch_size = lstm_utils.GLOVE_BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
             collate_fn=lstm_utils.collate_fn_glove
@@ -38,7 +38,7 @@ class WsdDataModule(LightningDataModule):
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size = lstm_utils.BATCH_SIZE,
+            batch_size = lstm_utils.GLOVE_BATCH_SIZE,
             num_workers = lstm_utils.NUM_WORKERS,
             shuffle = False,
             collate_fn=lstm_utils.collate_fn_glove

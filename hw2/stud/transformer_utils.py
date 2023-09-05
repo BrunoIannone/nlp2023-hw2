@@ -9,9 +9,9 @@ BATCH_SIZE = 16
 NUM_WORKERS = 0
 LEARNING_RATE = [1e-2,1e-3]
 LEARNING_RATE2 = [1e-2,1e-3]
-weight_decay = [0]#[0,0.001,0.1]
+weight_decay = [0,0.001,0.01]
 transformer_learning_rate = [1e-5]
-transformer_weight_decay = [0]#[0,0.001,0.1]
+transformer_weight_decay = [0,0.001,0.1]
 LIN_DROPOUT = [0.5,0.8]
 NUM_EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -49,7 +49,6 @@ def build_data_from_json(file_path: str, save_words: bool = False):
                 samples: List[{"instance_ids": {"id" (int): str}, "lemmas": List[str], "words": List[str], "pos_tags" = List[str], "senses": {"word_index" (int): List[str] (senses)},"candidates": {"word_index" (int): List[str](candidate senses)}}], 
 
             }
-
     """
     try:
         f = open(file_path, 'r')
@@ -60,9 +59,10 @@ def build_data_from_json(file_path: str, save_words: bool = False):
     samples = []
     data = json.load(f)
     for json_line in data:
-        #samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
-         #               "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
-        samples.append({"words": data[json_line]["words"],"senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        
+        samples.append({"instance_ids": data[json_line]["instance_ids"], "lemmas": data[json_line]["lemmas"], "words": data[json_line]["words"],
+        "pos_tags": data[json_line]["pos_tags"], "senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
+        #samples.append({"words": data[json_line]["words"],"senses": data[json_line]["senses"], "candidates": data[json_line]["candidates"]})
         
         if (save_words):
             words.append(data[json_line]["words"])
@@ -105,12 +105,12 @@ def word_to_idx(word_to_idx: dict, sentence: List[str]):
 
 def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
     """Converts labels string in integer indexes.
-    If there is only one possible sense and it's in labels_to_idx, then its index is taken. If there are more possible senses, the first known sense found in labels_to_idx is taken.
-    If there is only one sense and it's unknown or there are multiple senses but they are not known, the label corresponding to 'O' is taken.
+    If there is only one possible sense and it is in labels_to_idx, then its index is taken. If there are more possible senses, the first known sense index is taken.
+    If there is only one sense and it's unknown or there are multiple senses but they are all not known, the index corresponding to 'O' is taken.
 
     Args:
         labels_to_idx (dict): dictionary with structure {label:index} 
-        target_word_idx (dict): {"target_word_index": List[str](senses)}
+        target_word_idx (dict): {target_word_index (int): List[str](senses)}
 
     Returns:
         dict: {"word_index": List[int](senses)}
@@ -120,12 +120,12 @@ def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
     modified = False
 
     for word_idx in target_word_idx:
+        
         if target_word_idx[word_idx][0] not in list(labels_to_idx.keys()) and len(target_word_idx[word_idx])==1 : #Only one possible sense not in labels_to_idx
             
             res[word_idx] = labels_to_idx['O']
         
         elif len(target_word_idx[word_idx])>1: #More possible senses, take the first known
-            ## //TODO: in un futuro qua vanno usati i gloss #
             
             for sense in target_word_idx[word_idx]:
                
@@ -144,7 +144,7 @@ def label_to_idx(labels_to_idx: dict, target_word_idx:dict):
     
     return res
 
-
+#TODO:decidere qua che fare
 def build_all_senses_with_gloss(file_path:str, sentence_model: None,fine_grained:bool = False):
     """Get all senses from the mapping file
 
@@ -191,7 +191,7 @@ def build_all_senses(file_path:str,fine_grained:bool = False):
     """Get all senses from the mapping file
 
     Args:
-        file_path (str): file containing coarse-grained mapping
+        file_path (str): path to file containing coarse-grained mapping
         fine_grained (bool): True for fine grained operations. Default = False
     Returns:
         List[List[str]]: List of list of senses
@@ -250,8 +250,6 @@ def collate_fn(batch: List[dict]):
 
     batch_out["word_ids"] = word_ids
     batch_out["labels"] = labels
-    #print(labels)
-    #time.sleep(10)
     batch_out["idx"] = idx
 
     return batch_out
@@ -268,7 +266,7 @@ def map_new_index(batch:List[dict], batch_out:dict):
         batch_out (dict): batch after word tokenization
 
     Returns:
-        Tensor: new sentence word indices after tokenization. 
+        Tensor: new target word indices after tokenization. 
     
     """
     word_ids = []
@@ -298,7 +296,7 @@ def map_new_index(batch:List[dict], batch_out:dict):
         res, batch_first=True, padding_value=-1) # -1 is the chosen pad value
     return word_ids_
 
-import sentence_transformers
+#import sentence_transformers
 def extract_labels_and_sense_indices(batch: List[dict]):
     """Extract labels (senses) and target word indices for all the sentences
 

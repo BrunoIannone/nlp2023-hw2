@@ -1,7 +1,6 @@
 import os
 import torch
 from typing import List
-
 from allennlp.modules.elmo import batch_to_ids
 
 
@@ -12,25 +11,24 @@ NUM_WORKERS = 12
 EPOCHS_NUM = 500
 DROPOUT_LAYER = [0.5] #k
 DROPOUT_EMBED = [0.5]
-BATCH_SIZE = 600 #BATCH_SIZE = 600 per GloVe, 32 per ELMo
-
 LEARNING_RATE = [1e-2] #i
-LIN_WD = [0]#[0,0.001, 0.01]
+LIN_WD = [0, 0.001, 0.01, 0.1]
 
 ### ELMO HYPERPARAMETERS ###
-
+ELMO_BATCH_SIZE = 32
 ELMO_LR = [1e-5] #j
-LAYERS_NUM = 2
-ELMO_WD = [0.001]#[0,0.001, 0.01]
+ELMO_HIDDEN_DIM = 512
+ELMO_WD = [0, 0.001, 0.01]
 
 ### GLOVE HYPERPARAMETERS ###
-
+GLOVE_BATCH_SIZE = 600
 EMBEDDING_DIM = 300
 HIDDEN_DIM = 150
 BIDIRECTIONAL = True
+LAYERS_NUM = 2
 DROPOUT_LSTM = 0.2
-LSTM_LR = [1e-2]
-LSTM_WD = [0.001]#[0,0.001, 0.01]
+LSTM_LR = [1e-3]
+LSTM_WD = [0, 0.001, 0.01, 0.1]
 
 ############################
 
@@ -41,7 +39,7 @@ def extract_labels_and_sense_indices(batch: List[dict]):
     """Extract labels (senses) and target word indices for all the sentences
 
     Args:
-        batch (List[dict]): sample dict
+        batch (List[dict]): List of sample dicts
 
     Returns:
         tuple: (labels , indices) where both values are tensors
@@ -92,13 +90,12 @@ def collate_fn_elmo(batch):
 
 
 
-def get_senses_vector(model_output, tensor_idx, word_ids):
+def get_senses_vector(model_output, tensor_idx):
     """This function extracts the vector embedding for each target words for each sentence
 
     Args:
         model_output (Tensor): transformer output tensor
         tensor_idx (Tensor): Tensor where each row contains all sentence original target word indices
-        word_ids (Tensor): Tensor where each row contains all sentence new target word indices (after suubwords tokenizations)
     Returns:
         Tensor: The stacked tensor of all target words embedding
     """

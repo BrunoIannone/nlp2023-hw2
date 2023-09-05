@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModel, BertForTokenClassification,AutoModelForTokenClassification,optimization
 #import stud.utilz as utilz
-import utilz
+import transformer_utils
 import pytorch_lightning as pl
 import time
 import torchmetrics
@@ -60,10 +60,10 @@ class WSD(pl.LightningModule):
         
         transformers_outputs = self.backbone(**model_kwargs)    
         transformers_outputs_sum = torch.stack(transformers_outputs.hidden_states[-4:], dim=0).sum(dim=0)
-        transformers_outputs_sum = utilz.get_senses_vector(transformers_outputs_sum,idx,word_ids )
-        transformers_outputs_sum = self.lin_dropout(transformers_outputs_sum)
+        embed,cls = transformer_utils.get_senses_vector_fine(transformers_outputs_sum,idx,word_ids )
+        transformers_outputs_sum = self.lin_dropout(embed)
         logits = self.classifier(transformers_outputs_sum)   
-        return logits
+        return logits,embed + cls
 
     
     def configure_optimizers(self):
@@ -91,35 +91,35 @@ class WSD(pl.LightningModule):
     
     def training_step(self,train_batch,batch_idx):
 
-        outputs = self(**train_batch)
+        outputs = self(**train_batch)[0]
         
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),train_batch["labels"].view(-1),ignore_index=-100)
         
-        self.log_dict({'train_loss':loss},on_epoch=True, batch_size=utilz.BATCH_SIZE,on_step=False,prog_bar=True)
+        self.log_dict({'train_loss':loss},on_epoch=True, batch_size=transformer_utils.BATCH_SIZE,on_step=False,prog_bar=True)
         
         return loss
         
 
     def validation_step(self, val_batch,idx):
-        outputs = self(**val_batch)
+        outputs = self(**val_batch)[0]
         y_pred = outputs.argmax(dim = 1)
        
        
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),val_batch["labels"].view(-1),ignore_index=-100)
         
         self.val_metric(y_pred,val_batch["labels"])
-        self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        self.log_dict({'val_loss':loss,'valid_f1': self.val_metric},batch_size=transformer_utils.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
     
         
     def test_step(self, test_batch,idx):
         
-        outputs = self(**test_batch)
+        outputs = self(**test_batch)[0]
         y_pred = outputs.argmax(dim = 1)
         
         loss = F.cross_entropy(outputs.view(-1, self.num_labels),test_batch["labels"].view(-1),ignore_index=-100)
 
         self.test_metric(y_pred,test_batch["labels"])
-        self.log_dict({'test_loss':loss,'test_f1': self.test_metric},batch_size=utilz.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
+        self.log_dict({'test_loss':loss,'test_f1': self.test_metric},batch_size=transformer_utils.BATCH_SIZE,on_epoch=True, on_step=False,prog_bar=True)
                       
 
     

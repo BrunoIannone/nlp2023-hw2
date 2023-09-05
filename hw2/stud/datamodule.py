@@ -1,13 +1,24 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-import utilz
+import transformer_utils
 import lstm_utils
 import wsddataset
 
 class WsdDataModule(LightningDataModule):
-    def __init__(self,training_data, valid_data, test_data,labels_to_idx):
-        super().__init__()
+    """Datamodule for WSD with tensor
+
     
+    """
+    def __init__(self,training_data:dict, valid_data:dict, test_data:dict,labels_to_idx:dict):
+        """Init function for WSD datamodule with tensor
+
+        Args:
+            training_data (dict): {sample:{List[sample_dicts]}} for training
+            valid_data (dict): {sample:{List[sample_dicts]}} for valid
+            test_data (dict): {sample:{List[sample_dicts]}} for test
+            labels_to_idx (dict):  dictionary with structure {label:index} 
+        """
+        super().__init__()
         self.training_data = training_data
         self.valid_data = valid_data
         self.test_data = test_data
@@ -23,24 +34,24 @@ class WsdDataModule(LightningDataModule):
         
         return DataLoader(
             self.train_dataset,
-            batch_size = utilz.BATCH_SIZE,
-            num_workers = utilz.NUM_WORKERS,
+            batch_size = transformer_utils.BATCH_SIZE,
+            num_workers = transformer_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=utilz.collate_fn
+            collate_fn=transformer_utils.collate_fn
         ) 
     def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
-            batch_size = utilz.BATCH_SIZE,
-            num_workers = utilz.NUM_WORKERS,
+            batch_size = transformer_utils.BATCH_SIZE,
+            num_workers = transformer_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=utilz.collate_fn
+            collate_fn=transformer_utils.collate_fn
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size = utilz.BATCH_SIZE,
-            num_workers = utilz.NUM_WORKERS,
+            batch_size = transformer_utils.BATCH_SIZE,
+            num_workers = transformer_utils.NUM_WORKERS,
             shuffle = False,
-            collate_fn=utilz.collate_fn
+            collate_fn=transformer_utils.collate_fn
         )

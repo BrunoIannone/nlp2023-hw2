@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 #import stud.utilz as utilz
-import  utilz
+import  transformer_utils
 
 from typing import List
 import time
@@ -42,7 +42,7 @@ class WsdDataset(Dataset):
         """
         
         #converte index-th sample senses in indices
-        self.samples[index]["senses"] = utilz.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
+        self.samples[index]["senses"] = transformer_utils.label_to_idx(self.labels_to_idx, self.samples[index]["senses"])
         return {
             
             "sample": self.samples[index],

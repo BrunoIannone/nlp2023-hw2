@@ -4,7 +4,7 @@ import stud.wsd_model as wsd_model
 from model import Model
 from transformers import AutoTokenizer,AutoModel
 import os
-import stud.utilz as utilz
+import transformer_utils
 import json
 import pytorch_lightning as pl
 from typing import List
@@ -68,7 +68,7 @@ class StudentModel(Model):
                 fp.close()
 
             with open(os.path.join(path, "../../model/idx_to_word.txt"), "r") as fp:
-                vocab["idx_to_word"] = json.load(fp, object_hook=utilz.str_to_int)
+                vocab["idx_to_word"] = json.load(fp, object_hook=transformer_utils.str_to_int)
                 fp.close()
 
         with open(os.path.join(path, "../../model/labels_to_idx.txt"), "r") as fp:
@@ -77,7 +77,7 @@ class StudentModel(Model):
 
         with open(os.path.join(path,  "../../model/idx_to_labels.txt"), "r") as fp:
             vocab["idx_to_labels"] = json.load(
-                fp, object_hook=utilz.str_to_int)
+                fp, object_hook=transformer_utils.str_to_int)
             fp.close()
         return vocab
     
@@ -120,15 +120,15 @@ class StudentModel(Model):
                 if not modified:
                     unknown_candidates.append(sample["candidates"][candidate][0])
             
-        sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], sample["candidates"])
+        sample["senses"] = transformer_utils.label_to_idx(self.vocab["labels_to_idx"], sample["candidates"])
         sample = {"sample": sample}
             
-        batch = utilz.collate_fn([sample]).to(self.device)
+        batch = transformer_utils.collate_fn([sample]).to(self.device)
            
         y_pred = self.model(**batch)
         y_pred = y_pred.argmax(dim = 1)
 
-        predicted_labels = utilz.idx_to_label(
+        predicted_labels = transformer_utils.idx_to_label(
         list(self.vocab["labels_to_idx"].keys()), y_pred.tolist())
         
         for i in range(len(unknown_candidates)):
@@ -164,10 +164,10 @@ class StudentModel(Model):
             elif all(candidate in self.vocab["labels_to_idx"].keys() for candidate in sample["candidates"][target]):
                 
                 
-                sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"],  {target : sample["candidates"][target]})
+                sample["senses"] = transformer_utils.label_to_idx(self.vocab["labels_to_idx"],  {target : sample["candidates"][target]})
                 sample_ = {"sample": sample}
             
-                batch = utilz.collate_fn([sample_]).to(self.device)
+                batch = transformer_utils.collate_fn([sample_]).to(self.device)
            
                 y_pred = self.model(**batch)
                 print(sample["senses"])
@@ -175,11 +175,11 @@ class StudentModel(Model):
                 y_pred_temp = self.max_result(y_pred,[sample["senses"][target]])
                 if y_pred_temp == None:
                     y_pred = y_pred.argmax(dim = 1)
-                    predicted_labels = utilz.idx_to_label(
+                    predicted_labels = transformer_utils.idx_to_label(
                     list(self.vocab["labels_to_idx"].keys()), [y_pred])
                     res.append(predicted_labels)
                 else:
-                    predicted_labels = utilz.idx_to_label(
+                    predicted_labels = transformer_utils.idx_to_label(
                     list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
                     res.append(predicted_labels)
             else:
@@ -197,10 +197,10 @@ class StudentModel(Model):
                     res.append(unknown_candidate[0])
                     continue
                 #print(sample["candidates"][target])
-                sample["senses"] = utilz.label_to_idx(self.vocab["labels_to_idx"], {target : sample["candidates"][target]})
+                sample["senses"] = transformer_utils.label_to_idx(self.vocab["labels_to_idx"], {target : sample["candidates"][target]})
                 sample_ = {"sample": sample}
             
-                batch = utilz.collate_fn([sample_]).to(self.device)
+                batch = transformer_utils.collate_fn([sample_]).to(self.device)
            
                 y_pred = F.softmax(self.model(**batch),dim = 1)
                 #print(y_pred,y_pred.size())
@@ -208,7 +208,7 @@ class StudentModel(Model):
                 if y_pred_temp == None:
                     res.append(unknown_candidate[0])
                 else:
-                    predicted_labels = utilz.idx_to_label(
+                    predicted_labels = transformer_utils.idx_to_label(
                     list(self.vocab["labels_to_idx"].keys()), [y_pred_temp])
                     res.append(predicted_labels)
 
